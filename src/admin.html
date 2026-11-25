@@ -52,6 +52,7 @@ main { padding: 12px 16px 60px; }
 .tag { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 99px; }
 .tag.pending { background: var(--warn-soft); color: var(--warn); } .tag.admin { background: var(--line); color: var(--muted); }
 .addform { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.addform select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
 .addform input { flex: 1; min-width: 140px; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -115,6 +116,9 @@ textarea { min-height: 110px; }
   <section id="tab-people" hidden>
     <div class="card">
       <h2>Po osobi</h2>
+      <p class="row"><button class="btn" id="payrollBtn">⬇ Obračun sati za servise (CSV)</button></p>
+      <p class="note">Za obračun: redovni sati i sati uz +50 % (noću 22–06, nedjeljom, blagdanom 25. 12., 26. 12. i 1. 1.), odvojeno za prosinac (XII) i siječanj (I), jer se godine obračunavaju posebno.
+        Procjena neto: 11,15 € i 16,73 € po satu. SCRI-ju šaljete studente, a Domu mladih učenike. „Drugo” ne ide servisima.</p>
       <p class="note">Sati po ISO tjednu (50: 7.–13.12., 51: 14.–20.12., 52: 21.–27.12., 53: 28.12.–3.1.). Crveno je iznad <span id="maxw">30</span> h tjedno (moguće samo ako je organizator ručno dodao smjenu).</p>
       <div class="scroll"><table id="people"></table></div>
     </div>
@@ -226,7 +230,9 @@ let pw = '', data = null, tab = 'slots', toastT;
 try { pw = sessionStorage.getItem(KEY) || ''; } catch {}
 
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
+const KIND = { student: 'student', ucenik: 'učenik', drugo: 'drugo' };
 const ERR = {
+  rest: 'Nakon večernjeg bloka B osoba ne može sutradan u jutarnji blok A (12 h odmora).', pupil_dates: 'Učenici smiju raditi tek od 24. 12. (zimski praznici).',
   full: 'Termin je popunjen.', one_per_day: 'Osoba već ima smjenu taj dan.', week_hours: 'Osoba bi prešla tjedni limit sati.',
   already: 'Osoba je već na tom terminu.', name: 'Upišite ime i prezime.', phone: 'Neispravan broj mobitela.',
   slots_in_use: 'Ovi termini imaju prijave pa ih CSV ne može maknuti:', invalid: 'Neispravan unos.', too_many: 'Previše pokušaja. Pričekajte 15 minuta.',
@@ -308,12 +314,13 @@ function renderDays() {
         <label class="note">mjesta <input type="number" min="0" max="50" value="${s.capacity}" data-cap="${s.id}"></label>
         <button class="btn small" data-add="${s.id}">+ Dodaj</button></div>
         <ul class="regs">${regs.map(r => `<li><span class="who"><b>${esc(r.name)}</b> · <a href="tel:${esc(r.phone)}">${esc(r.phone_fmt)}</a>
-          ${r.status === 'pending' ? '<span class="tag pending">čeka potvrdu</span>' : ''}${r.source === 'admin' ? '<span class="tag admin">dodao organizator</span>' : ''}</span>
+          ${r.status === 'pending' ? '<span class="tag pending">čeka potvrdu</span>' : ''}${r.source === 'admin' ? '<span class="tag admin">dodao organizator</span>' : ''}<span class="tag admin">${KIND[r.kind] || ''}</span></span>
           ${r.status === 'pending' ? `<button class="btn small primary" data-confirm="${r.id}">Potvrdi</button>` : ''}
           <button class="btn small" data-link="${esc(r.token)}" title="Kopiraj privatnu poveznicu osobe">🔗</button>
           <button class="btn small" data-del="${r.id}" title="Ukloni">✕</button></li>`).join('')}</ul>
         <form class="addform" data-addform="${s.id}" hidden>
           <input name="name" placeholder="Ime i prezime" required><input name="phone" type="tel" placeholder="Mobitel" required>
+          <select name="kind" aria-label="Servis"><option value="drugo">Drugo (ja, prijatelji)</option><option value="student">Student (SCRI)</option><option value="ucenik">Učenik (Dom mladih)</option></select>
           <button class="btn small primary">Spremi</button></form></div>`;
     }
     html += '</div>';
@@ -338,10 +345,10 @@ $('days').addEventListener('click', async e => {
 $('days').addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.target, slot = f.dataset.addform;
-  const payload = { slot, name: f.name.value, phone: f.phone.value };
+  const payload = { slot, name: f.name.value, phone: f.phone.value, kind: f.kind.value };
   try { data = await api('regs', { method: 'POST', body: JSON.stringify(payload) }); render(); toast('Dodano.'); }
   catch (err) {
-    if (!['full', 'one_per_day', 'week_hours'].includes(err.error)) return toast(err.message);
+    if (!['full', 'one_per_day', 'week_hours', 'rest', 'pupil_dates'].includes(err.error)) return toast(err.message);
     if (confirm(`${err.message}${err.hours ? ` (${hrs(err.hours)})` : ''}\n\nIpak dodati?`)) {
       await run(api('regs', { method: 'POST', body: JSON.stringify({ ...payload, force: true }) })).catch(() => {});
     }
@@ -354,13 +361,18 @@ $('days').addEventListener('change', async e => {
 
 function renderPeople() {
   const weeks = [...new Set(data.slots.map(s => isoWeek(s.day)))].sort();
-  $('people').innerHTML = `<tr><th>Ime i prezime</th><th>Mobitel</th>${weeks.map(w => `<th class="num">T${w.slice(-2)}</th>`).join('')}<th class="num">Ukupno</th><th>Smjene</th></tr>`
+  const n = v => String(Math.round(v * 100) / 100).replace('.', ',');
+  const ph = (p, y, k) => (p.pay[y] ? p.pay[y][k] : 0);
+  $('people').innerHTML = `<tr><th>Ime i prezime</th><th>Mobitel</th><th>Servis</th>${weeks.map(w => `<th class="num">T${w.slice(-2)}</th>`).join('')}<th class="num">Ukupno</th>
+      <th class="num" title="Redovni sati / sati +50 % u prosincu">XII red. / +50%</th><th class="num" title="Redovni sati / sati +50 % u siječnju">I red. / +50%</th><th class="num">≈ neto</th><th>Smjene</th></tr>`
     + data.people.map(p => `<tr class="${p.over ? 'over' : ''}"><td><b>${esc(p.name)}</b>${p.over ? ' <span class="over-txt">⚠ iznad limita</span>' : ''}</td>
-      <td><a href="tel:${esc(p.phone)}">${esc(p.phone_fmt)}</a></td>
+      <td><a href="tel:${esc(p.phone)}">${esc(p.phone_fmt)}</a></td><td>${KIND[p.kind] || ''}</td>
       ${weeks.map(w => { const h = p.weeks[w] || 0; return `<td class="num${h > data.max_week ? ' over-txt' : ''}">${h ? hrs(h) : '–'}</td>`; }).join('')}
       <td class="num"><b>${hrs(p.total)}</b></td>
+      <td class="num">${n(ph(p, '2026', 'reg'))} / ${n(ph(p, '2026', 'plus'))}</td><td class="num">${n(ph(p, '2027', 'reg'))} / ${n(ph(p, '2027', 'plus'))}</td>
+      <td class="num">${n(p.net)} €</td>
       <td>${p.shifts.sort((a, b) => a.id.localeCompare(b.id)).map(s => shortDay(s.day) + s.id.slice(-1)).join(', ')}</td></tr>`).join('')
-    + (data.people.length ? '' : '<tr><td colspan="9" class="note">Još nema prijava.</td></tr>');
+    + (data.people.length ? '' : '<tr><td colspan="13" class="note">Još nema prijava.</td></tr>');
 }
 function isoWeek(day) {
   const d = new Date(day + 'T12:00:00Z');
@@ -412,6 +424,7 @@ async function download(path, name) {
 }
 $('exportBtn').onclick = () => download('export.csv', `prijave-advent-${new Date().toISOString().slice(0, 10)}.csv`);
 $('exportSheetBtn').onclick = () => download('export-tablica.csv', 'prijave-za-tablicu.csv');
+$('payrollBtn').onclick = () => download('obracun.csv', 'obracun-sati-advent-2026.csv');
 
 $('wipeBtn').onclick = async () => {
   if ($('wipeTxt').value.trim() !== 'OBRIŠI') return toast('Upišite OBRIŠI za potvrdu.');

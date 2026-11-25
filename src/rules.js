@@ -3,6 +3,16 @@
 
 export const MAX_WEEK_HOURS = 30;
 
+// Who works through which service (from the organizer's plan "Plan, ugovori i proračun"):
+//   student: Student servis Rijeka (SCRI), any day;
+//   ucenik:  adult secondary-school pupil, Učenički servis Dom mladih Rijeka, only in the winter holidays (from 24.12.);
+//   drugo:   the organizer and friends, added in /admin, no service.
+export const KINDS = ['student', 'ucenik', 'drugo'];
+export const PUPIL_FROM = '2026-12-24';
+// Pay (net per hour): base, and +50 % at night (22–06), on Sundays and on public holidays
+export const PAY_BASE = 11.15, PAY_PLUS = 16.73;
+export const HOLIDAYS = ['2026-12-25', '2026-12-26', '2027-01-01'];
+
 // ---- phone numbers: one person = one normalized mobile number ----
 // "091 234 5678", "+385 91 234 5678", "00385912345678" and "385912345678" are all "+385912345678"
 export function normalizePhone(v) {
@@ -144,11 +154,22 @@ export function parseSlotsCsv(text) {
 // ---- a person's choice ----
 // existing: the person's shifts already booked [{day, hours}], chosen: the new shifts [{id, day, hours}].
 // Returns null or {error, day|week, hours}.
-export function checkChoice(existing, chosen, maxWeek = MAX_WEEK_HOURS) {
+// existing/chosen: [{id, day, block, hours}]; kind: student | ucenik | drugo
+export function checkChoice(existing, chosen, kind = 'student', maxWeek = MAX_WEEK_HOURS) {
+  if (kind === 'ucenik') {
+    const early = chosen.find(s => s.day < PUPIL_FROM);
+    if (early) return { error: 'pupil_dates', day: early.day, slot: early.id };
+  }
   const days = new Set(existing.map(s => s.day));
   for (const s of chosen) {
     if (days.has(s.day)) return { error: 'one_per_day', day: s.day, slot: s.id };
     days.add(s.day);
+  }
+  // at least 12 hours of rest between shifts: after an evening shift (until 00:00 or 03:00) no morning shift the next day
+  const all = [...existing, ...chosen], isNew = new Set(chosen.map(s => s.id));
+  for (const b of all.filter(s => s.block === 'B')) {
+    const a = all.find(s => s.block === 'A' && s.day === addDays(b.day, 1));
+    if (a && (isNew.has(a.id) || isNew.has(b.id))) return { error: 'rest', day: a.day, slot: isNew.has(a.id) ? a.id : b.id };
   }
   const weeks = {};
   for (const s of [...existing, ...chosen]) { const w = isoWeek(s.day); weeks[w] = (weeks[w] || 0) + s.hours; }
@@ -156,6 +177,20 @@ export function checkChoice(existing, chosen, maxWeek = MAX_WEEK_HOURS) {
     if (h > maxWeek + 1e-9 && chosen.some(s => isoWeek(s.day) === w)) return { error: 'week_hours', week: w, hours: h };
   }
   return null;
+}
+
+// Hours of one shift for the payroll: regular and +50 % (22–06, Sundays, holidays), split by calendar year,
+// because the services settle December and January separately. → {2026: {reg, plus}, 2027: {...}}
+export function payHours(s) {
+  const out = {}, start = slotStartMs(s), end = start + s.hours * 3600e3, step = 15 * 60e3;
+  for (let t = start; t < end; t += step) {
+    const local = new Date(t + 3600e3);                       // winter time in Croatia: UTC+1
+    const day = local.toISOString().slice(0, 10), h = local.getUTCHours();
+    const plus = h >= 22 || h < 6 || local.getUTCDay() === 0 || HOLIDAYS.includes(day);
+    const y = out[day.slice(0, 4)] ||= { reg: 0, plus: 0 };
+    y[plus ? 'plus' : 'reg'] += 0.25;
+  }
+  return out;
 }
 
 export function weekHours(list) {

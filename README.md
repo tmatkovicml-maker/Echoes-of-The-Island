@@ -9,6 +9,9 @@ Mala web aplikacija preko koje punoljetni učenici sami biraju smjene u adventsk
 - **Pun termin se odmah zatvara.** Broj mjesta provjerava se na poslužitelju u jednoj transakciji. Sve prijave obrađuje jedan Cloudflare Durable Object, i to jednu po jednu, pa dvije istovremene prijave ne mogu zauzeti isto zadnje mjesto. To dokazuje test u kojem se 30 ljudi istovremeno prijavljuje na jedno mjesto i samo jedan uspije.
 - **Najviše 30 sati tjedno** po osobi, po ISO tjednima (10.–13.12. je 50. tjedan, a 28.12.–2.1. je 53. tjedan).
 - **Najviše jedan blok dnevno** po osobi.
+- **12 sati odmora**: nakon večernjeg bloka B osoba ne može sutradan raditi jutarnji blok A.
+- **Studenti i učenici**: osoba odabere „Student” (Student servis Rijeka, SCRI) ili „Učenik 18+” (Učenički servis Dom mladih Rijeka). Redoviti učenici smiju raditi samo za zimskih praznika, pa mogu birati termine tek **od 24. 12.** Studenti mogu od 10. 12. Vi i prijatelji dodajete se u adminu kao „Drugo”, bez servisa.
+- Nakon prijave stranica podsjeti studenta da prije prvog rada generira e-ugovor na rad.uniri.hr, a učenika da mora biti učlanjen u Dom mladih i da se ugovor naručuje do 18. 12.
 - Osoba se prepoznaje po **broju mobitela**. Zapisi „091 234 5678”, „+385 91 234 5678” i „00385912345678” vode se kao isti broj.
 - Ako jedan termin iz prijave ne prolazi, ne sprema se ništa i učenik dobiva objašnjenje zašto.
 - Zaštita od zlouporabe: najviše 15 prijava po IP adresi u 10 minuta, skriveno polje (honeypot) za botove i 10 pogrešnih lozinki po IP adresi u 15 minuta.
@@ -33,9 +36,12 @@ Kasnije promjene:
 |---|---|---|
 | Rok za otkazivanje | **48 h** prije početka smjene | Poslije toga učenik ne može sam otkazati, nego se javlja organizatoru. 0 znači da može otkazati sve do početka smjene. |
 | Ručna potvrda | **isključena**, prijava vrijedi odmah | Ako je uključite, svaka prijava čeka vašu potvrdu, ali mjesto je već zauzeto. Učenik stanje vidi na svojoj poveznici. |
-| Satnica i uvjeti rada | prazno | Prikazuju se učenicima samo ako ih upišete. |
+| Satnica i uvjeti rada | 11,15 € neto/h, 16,73 € noću, nedjeljom i blagdanom, i preko kojeg servisa | Prikazuje se na stranici prijava. Može se promijeniti ili obrisati. |
 | Organizator | prazno | Naziv i kontakt za obavijest o privatnosti. |
 | Automatsko brisanje | **31. 1. 2027.** | Tog dana se brišu sva imena i mobiteli, a prijave se zatvaraju. |
+
+## Obračun sati za servise
+`/admin` → **Osobe** → **⬇ Obračun sati za servise (CSV)**. Za svaku osobu i godinu daje: servis, redovne sate, sate uz +50 % (noću 22–06, nedjeljom, blagdanom 25. 12., 26. 12. i 1. 1.), ukupno i procjenu neto iznosa (11,15 € i 16,73 € po satu). Prosinac 2026. i siječanj 2027. su u odvojenim recima, jer se godine obračunavaju posebno. Na primjer, blok B 31. 12. daje 6 redovnih sati i 2 sata +50 % u 2026. te 3 sata +50 % u 2027. Iste brojke vide se u tablici na kartici Osobe.
 
 ## Tablica Advent_2026 (list „Prijave”)
 U `/admin` gumb **⬇ Za tablicu (list Prijave)** daje CSV sa stupcima *Ime i prezime; Datum; Blok*, s datumom u obliku `2026-12-10`, koji Excel čita kao datum.

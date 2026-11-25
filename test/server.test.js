@@ -34,7 +34,7 @@ const call = (path, { body, method, admin, ip } = {}) => fetch(BASE + path, {
   body: body ? JSON.stringify(body) : undefined,
 }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }));
 const signUp = (slots, phone, name = 'Test Učenik', extra = {}) =>
-  call('/api/prijava', { body: { name, phone, slots, adult: true, consent: true, website: '', ...extra } });
+  call('/api/prijava', { body: { name, phone, slots, kind: 'student', adult: true, consent: true, website: '', ...extra } });
 const phone = n => `091 ${String(1000000 + n).slice(1, 4)} ${String(1000000 + n).slice(4)}`;
 const setCap = (id, capacity) => call(`/api/admin/slots/${id}`, { body: { capacity }, admin: true });
 const free = async id => (await call('/api/stanje')).data.slots.find(s => s.id === id).free;
@@ -84,10 +84,33 @@ test('one block a day, also when A and B are sent at the same moment', async () 
 });
 
 test('a sign-up with a rule broken is rejected as a whole', async () => {
-  // week 52: 23.12. B (8) + 24.12. B (11) + 25.12. B (8) + 26.12. A (7) = 34 h
-  const r = await signUp(['2026-12-23-B', '2026-12-24-B', '2026-12-25-B', '2026-12-26-A'], phone(500));
+  // week 52: 23.12. B (8) + 24.12. B (11) + 25.12. B (8) + 27.12. B (11) = 38 h
+  const r = await signUp(['2026-12-23-B', '2026-12-24-B', '2026-12-25-B', '2026-12-27-B'], phone(500));
   assert.equal(r.data.error, 'week_hours');
   assert.equal((await call('/api/admin/data', { admin: true })).data.regs.filter(x => x.phone_fmt === phone(500)).length, 0);
+});
+
+test('12 h rest, pupils only in the holidays, student or pupil required', async () => {
+  assert.equal((await signUp(['2026-12-16-B', '2026-12-17-A'], phone(4000))).data.error, 'rest');
+  await signUp(['2026-12-18-B'], phone(4001));
+  assert.equal((await signUp(['2026-12-19-A'], phone(4001))).data.error, 'rest');
+  assert.equal((await signUp(['2026-12-23-A'], phone(4002), 'Ena Enić', { kind: 'ucenik' })).data.error, 'pupil_dates');
+  assert.equal((await signUp(['2026-12-28-B'], phone(4002), 'Ena Enić', { kind: 'ucenik' })).status, 200);
+  assert.equal((await signUp(['2026-12-29-B'], phone(4003), 'Ena Enić', { kind: undefined })).data.error, 'kind');
+  const mine = await signUp(['2026-12-30-B'], phone(4004), 'Ivo Ivić', { kind: 'ucenik' });
+  assert.equal(mine.data.kind, 'ucenik');
+});
+
+test('payroll: regular and +50 % hours per person and calendar year', async () => {
+  // 31.12. B 16–03: 6 h regular + 2 h night in 2026, 3 h on 1.1.2027 (holiday, night)
+  await setCap('2026-12-31-B', 9);
+  await signUp(['2026-12-31-B', '2026-12-13-A'], phone(5000), 'Pero Perić');   // 13.12. is a Sunday: 7 h +50 %
+  const p = (await call('/api/admin/data', { admin: true })).data.people.find(x => x.phone_fmt === phone(5000));
+  assert.deepEqual(p.pay, { 2026: { reg: 6, plus: 9 }, 2027: { reg: 0, plus: 3 } });
+  assert.equal(p.net, Math.round((6 * 11.15 + 12 * 16.73) * 100) / 100);
+  const csv = await fetch(BASE + '/api/admin/obracun.csv', { headers: { 'X-Admin-Password': PW } }).then(r => r.text());
+  assert.ok(csv.includes('Pero Perić;' + phone(5000) + ';Student (SCRI);2026;6;9;15;'));
+  assert.ok(csv.includes('Pero Perić;' + phone(5000) + ';Student (SCRI);2027;0;3;3;'));
 });
 
 test('form checks: adult, consent, honeypot, name, phone', async () => {
@@ -229,6 +252,6 @@ test('QR code of the menu', async () => {
 
 test('per-IP limit on sign-ups', async () => {
   const one = [];
-  for (let i = 0; i < 17; i++) one.push(await call('/api/prijava', { ip: '10.200.0.1', body: { name: 'Spam Spam', phone: phone(2000 + i), slots: ['2027-01-02-A'], adult: true, consent: true } }));
+  for (let i = 0; i < 17; i++) one.push(await call('/api/prijava', { ip: '10.200.0.1', body: { name: 'Spam Spam', phone: phone(2000 + i), slots: ['2027-01-02-A'], kind: 'student', adult: true, consent: true } }));
   assert.ok(one.slice(15).every(r => r.data.error === 'too_many'));
 });

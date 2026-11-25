@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { normalizePhone, isoWeek, checkChoice, parseSlotsCsv, hoursBetween } from '../src/rules.js';
+import { normalizePhone, isoWeek, checkChoice, parseSlotsCsv, hoursBetween, payHours } from '../src/rules.js';
 
 test('phone numbers are normalized to one form', () => {
   for (const v of ['091 234 5678', '+385 91 234 5678', '00385912345678', '385912345678', '091/234-5678', '+385 (0)91 234 5678'])
@@ -65,4 +65,31 @@ test('organizer CSV in different shapes', () => {
   assert.deepEqual(c.map(s => s.id), ['2026-12-31-B', '2027-01-01-A']);
   assert.throws(() => parseSlotsCsv('Datum;Blok;Mjesta\n32.12.2026.;A;1\n'), /Redak 2/);
   assert.throws(() => parseSlotsCsv('Datum;Blok\n10.12.2026.;A\n'), /Mjesta/);
+});
+
+test('12 h rest: no morning block the day after an evening block', () => {
+  const S = (d, b) => ({ id: `${d}-${b}`, day: d, block: b, hours: b === 'A' ? 7 : 8 });
+  assert.equal(checkChoice([S('2026-12-15', 'B')], [S('2026-12-16', 'A')]).error, 'rest');
+  assert.equal(checkChoice([], [S('2026-12-16', 'A'), S('2026-12-15', 'B')]).error, 'rest');
+  assert.equal(checkChoice([S('2026-12-16', 'A')], [S('2026-12-15', 'B')]).error, 'rest');
+  assert.equal(checkChoice([], [S('2026-12-15', 'A'), S('2026-12-16', 'B')]), null);
+  assert.equal(checkChoice([], [S('2026-12-15', 'B'), S('2026-12-17', 'A')]), null);
+});
+
+test('pupils only from 24.12.', () => {
+  const S = (d, b) => ({ id: `${d}-${b}`, day: d, block: b, hours: 8 });
+  assert.equal(checkChoice([], [S('2026-12-23', 'B')], 'ucenik').error, 'pupil_dates');
+  assert.equal(checkChoice([], [S('2026-12-24', 'B')], 'ucenik'), null);
+  assert.equal(checkChoice([], [S('2026-12-23', 'B')], 'student'), null);
+});
+
+test('pay hours: night, Sundays, holidays, split by year', () => {
+  const S = (d, b, start, hours) => ({ id: `${d}-${b}`, day: d, block: b, start, hours });
+  assert.deepEqual(payHours(S('2026-12-15', 'A', '09:00', 7)), { 2026: { reg: 7, plus: 0 } });
+  assert.deepEqual(payHours(S('2026-12-15', 'B', '16:00', 8)), { 2026: { reg: 6, plus: 2 } });
+  assert.deepEqual(payHours(S('2026-12-13', 'A', '09:00', 7)), { 2026: { reg: 0, plus: 7 } });          // Sunday
+  assert.deepEqual(payHours(S('2026-12-25', 'A', '09:00', 7)), { 2026: { reg: 0, plus: 7 } });          // Christmas
+  assert.deepEqual(payHours(S('2026-12-24', 'B', '16:00', 11)), { 2026: { reg: 6, plus: 5 } });
+  assert.deepEqual(payHours(S('2026-12-31', 'B', '16:00', 11)), { 2026: { reg: 6, plus: 2 }, 2027: { reg: 0, plus: 3 } });
+  assert.deepEqual(payHours(S('2027-01-02', 'B', '16:00', 8)), { 2027: { reg: 6, plus: 2 } });
 });

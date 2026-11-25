@@ -19,6 +19,7 @@
 //   POST /api/admin/regs/:id/confirm     confirm a sign-up (when sign-ups are confirmed by hand)
 //   DELETE /api/admin/regs/:id           remove a sign-up
 //   POST /api/admin/wipe                 {confirm: "OBRIŠI"}  delete all names and phones now
+//   GET  /api/admin/obracun.csv          hours per person and year, regular / +50 %, for the services' payroll
 //   GET  /api/admin/export-tablica.csv  Ime i prezime;Datum;Blok for pasting into the "Prijave" sheet of the planning workbook
 //   GET  /api/admin/meni                 menu and orders per day · POST {items} save the menu · POST meni/import {csv}
 //   GET  /api/admin/narudzbe.csv         all orders for Excel
@@ -42,7 +43,7 @@ import MENU_PAGE from './menu.html';
 import KITCHEN_PAGE from './kitchen.html';
 import { STATUSES, PAY, businessDay, validItem, parseMenuCsv, priceOrder, ordersCsv } from './orders.js';
 import {
-  MAX_WEEK_HOURS, normalizePhone, formatPhone, isoWeek, isDay, checkChoice, weekHours,
+  MAX_WEEK_HOURS, KINDS, PAY_BASE, PAY_PLUS, normalizePhone, formatPhone, isoWeek, isDay, checkChoice, weekHours, payHours,
   parseSlotsCsv, slotStartMs,
 } from './rules.js';
 
@@ -51,7 +52,9 @@ const DEFAULTS = {
   open: true,             // sign-up open
   cancel_hours: 48,       // a student can cancel until this many hours before the shift starts
   manual: false,          // false: a sign-up counts at once; true: the organizer confirms each one (it holds the place meanwhile)
-  terms: '',              // pay and conditions, shown on the page only when filled in
+  // pay and conditions, shown on the sign-up page (the organizer can change or empty it in /admin)
+  terms: 'Satnica: 11,15 € neto po satu.\nNoću (22–06 h), nedjeljom i blagdanom (25. 12., 26. 12., 1. 1.): 16,73 € neto po satu (+50 %).\n'
+    + 'Studenti rade preko Student servisa Rijeka (SCRI), punoljetni učenici preko Učeničkog servisa Dom mladih Rijeka.',
   organizer: '',          // who collects the data (privacy notice)
   wipe_on: '2027-01-31',  // names and phones are deleted automatically on this day
   orders_open: false,     // QR orders are taken (switched on the hut's screen or in /admin)
@@ -80,6 +83,8 @@ export class Store extends DurableObject {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS regs (id INTEGER PRIMARY KEY AUTOINCREMENT, slot_id TEXT NOT NULL,
       phone TEXT NOT NULL, name TEXT NOT NULL, token TEXT NOT NULL, status TEXT NOT NULL, source TEXT NOT NULL, created INTEGER NOT NULL,
       UNIQUE (slot_id, phone))`);
+    // kind: student | ucenik | drugo (see rules.js); a database from before has none, so it is added
+    if (!this.sql.exec('PRAGMA table_info(regs)').toArray().some(c => c.name === 'kind')) this.sql.exec(`ALTER TABLE regs ADD COLUMN kind TEXT NOT NULL DEFAULT 'student'`);
     this.sql.exec('CREATE INDEX IF NOT EXISTS regs_phone ON regs (phone)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS regs_token ON regs (token)');
     const cols = this.sql.exec('PRAGMA table_info(slots)').toArray().map(c => c.name);
@@ -140,7 +145,7 @@ export class Store extends DurableObject {
     }
   }
   personShifts(phone) {
-    return this.sql.exec('SELECT s.id, s.day, s.hours FROM regs r JOIN slots s ON s.id = r.slot_id WHERE r.phone = ?', phone).toArray();
+    return this.sql.exec('SELECT s.id, s.day, s.block, s.hours FROM regs r JOIN slots s ON s.id = r.slot_id WHERE r.phone = ?', phone).toArray();
   }
 
   // ---- public ----
@@ -148,13 +153,13 @@ export class Store extends DurableObject {
     const st = this.settings();
     return {
       open: st.open, cancel_hours: st.cancel_hours, manual: st.manual, terms: st.terms, organizer: st.organizer,
-      wipe_on: st.wipe_on, max_week: MAX_WEEK_HOURS, now: Date.now(),
+      wipe_on: st.wipe_on, max_week: MAX_WEEK_HOURS, pupil_from: '2026-12-24', now: Date.now(),
       slots: this.slots().map(s => ({ ...s, free: Math.max(0, s.capacity - s.taken), taken: undefined })),
     };
   }
 
   // The checks and the writes happen in one synchronous transaction: nothing else runs in between.
-  async signUp({ name, phone, slots: ids }, ip) {
+  async signUp({ name, phone, kind, slots: ids }, ip) {
     if (this.limited('signup', ip)) return { status: 429, error: 'too_many' };
     this.hit('signup', ip);
     const res = this.ctx.storage.transactionSync(() => {
@@ -167,12 +172,12 @@ export class Store extends DurableObject {
         if (slotStartMs(s) <= now) return { status: 409, error: 'past', slot: s.id };
         if (this.taken(s.id) >= s.capacity) return { status: 409, error: 'full', slot: s.id };
       }
-      const bad = checkChoice(this.personShifts(phone), chosen);
+      const bad = checkChoice(this.personShifts(phone), chosen, kind);
       if (bad) return { status: 409, ...bad };
       const token = newToken(), status = st.manual ? 'pending' : 'confirmed';
       for (const s of chosen) {
-        this.sql.exec(`INSERT INTO regs (slot_id, phone, name, token, status, source, created) VALUES (?, ?, ?, ?, ?, 'web', ?)`,
-          s.id, phone, name, token, status, now);
+        this.sql.exec(`INSERT INTO regs (slot_id, phone, name, token, status, source, created, kind) VALUES (?, ?, ?, ?, ?, 'web', ?, ?)`,
+          s.id, phone, name, token, status, now, kind);
       }
       return { token };
     });
@@ -183,10 +188,10 @@ export class Store extends DurableObject {
 
   mine(token) {
     const st = this.settings(), now = Date.now();
-    const regs = this.sql.exec(`SELECT r.id, r.name, r.status, s.id AS slot_id, s.day, s.block, s.start, s."end" AS "end", s.hours
+    const regs = this.sql.exec(`SELECT r.id, r.name, r.status, r.kind, s.id AS slot_id, s.day, s.block, s.start, s."end" AS "end", s.hours
       FROM regs r JOIN slots s ON s.id = r.slot_id WHERE r.token = ? ORDER BY s.day, s.block`, token).toArray()
       .map(r => ({ ...r, can_cancel: now < slotStartMs(r) - st.cancel_hours * HOUR }));
-    return { regs, name: regs[0]?.name || '', cancel_hours: st.cancel_hours, manual: st.manual };
+    return { regs, name: regs[0]?.name || '', kind: regs[0]?.kind || '', cancel_hours: st.cancel_hours, manual: st.manual };
   }
   mineChecked(token, ip) {
     if (this.limited('mine', ip)) return { status: 429, error: 'too_many' };
@@ -206,27 +211,38 @@ export class Store extends DurableObject {
 
   // ---- organizer ----
   adminData() {
-    const regs = this.sql.exec(`SELECT r.id, r.slot_id, r.name, r.phone, r.status, r.source, r.created, r.token, s.day, s.hours
+    const regs = this.sql.exec(`SELECT r.id, r.slot_id, r.name, r.phone, r.status, r.source, r.created, r.token, r.kind, s.day, s.block, s.start, s.hours
       FROM regs r JOIN slots s ON s.id = r.slot_id ORDER BY s.day, s.block, r.created`).toArray();
-    // people: one per phone number, with hours per ISO week and in total
+    return {
+      settings: this.settings(), max_week: MAX_WEEK_HOURS, pay: { base: PAY_BASE, plus: PAY_PLUS }, slots: this.slots(),
+      regs: regs.map(r => ({ ...r, phone_fmt: formatPhone(r.phone), day: undefined, hours: undefined, block: undefined, start: undefined })),
+      people: this.people(regs),
+    };
+  }
+  // one per phone number: hours per ISO week, in total, and for the payroll (regular / +50 %, per calendar year)
+  people(regs) {
     const people = {};
     for (const r of regs) {
-      const p = people[r.phone] ||= { phone: r.phone, phone_fmt: formatPhone(r.phone), name: r.name, shifts: [], total: 0 };
-      p.name = r.name;
+      const p = people[r.phone] ||= { phone: r.phone, phone_fmt: formatPhone(r.phone), name: r.name, kind: r.kind, shifts: [], total: 0, pay: {} };
+      p.name = r.name; p.kind = r.kind;
       p.shifts.push({ id: r.slot_id, day: r.day, hours: r.hours });
       p.total = Math.round((p.total + r.hours) * 10) / 10;
+      for (const [y, h] of Object.entries(payHours(r))) {
+        const t = p.pay[y] ||= { reg: 0, plus: 0 };
+        t.reg += h.reg; t.plus += h.plus;
+      }
     }
     for (const p of Object.values(people)) {
       p.weeks = weekHours(p.shifts);
       p.over = Object.values(p.weeks).some(h => h > MAX_WEEK_HOURS);
+      p.net = Math.round(Object.values(p.pay).reduce((s, h) => s + h.reg * PAY_BASE + h.plus * PAY_PLUS, 0) * 100) / 100;
     }
-    return {
-      settings: this.settings(), max_week: MAX_WEEK_HOURS, slots: this.slots(),
-      regs: regs.map(r => ({ ...r, phone_fmt: formatPhone(r.phone), day: undefined, hours: undefined })),
-      people: Object.values(people).sort((a, b) => a.name.localeCompare(b.name, 'hr')),
-    };
+    return Object.values(people).sort((a, b) => a.name.localeCompare(b.name, 'hr'));
   }
-
+  payrollRows() {
+    return this.people(this.sql.exec(`SELECT r.slot_id, r.name, r.phone, r.kind, s.day, s.block, s.start, s.hours
+      FROM regs r JOIN slots s ON s.id = r.slot_id ORDER BY s.day, s.block`).toArray());
+  }
   async saveSettings(v) {
     const cur = this.settings();
     for (const k of Object.keys(DEFAULTS)) if (v[k] !== undefined) this.put(k, v[k]);
@@ -253,20 +269,20 @@ export class Store extends DurableObject {
   }
 
   // force: add even if the shift is full or the person would break a rule (the organizer decides)
-  addReg({ slot, name, phone, force }) {
+  addReg({ slot, name, phone, kind, force }) {
     const res = this.ctx.storage.transactionSync(() => {
       const s = this.slot(slot);
       if (!s) return { status: 404, error: 'unknown_slot' };
       if (this.sql.exec('SELECT 1 FROM regs WHERE slot_id = ? AND phone = ?', slot, phone).toArray().length) return { status: 409, error: 'already' };
       if (!force) {
         if (this.taken(slot) >= s.capacity) return { status: 409, error: 'full', slot };
-        const bad = checkChoice(this.personShifts(phone), [s]);
+        const bad = checkChoice(this.personShifts(phone), [s], kind);
         if (bad) return { status: 409, ...bad };
       }
       // the person's existing private link, so the organizer can send one link for all their shifts
       const prev = this.sql.exec('SELECT token FROM regs WHERE phone = ? ORDER BY created DESC LIMIT 1', phone).toArray()[0];
-      this.sql.exec(`INSERT INTO regs (slot_id, phone, name, token, status, source, created) VALUES (?, ?, ?, ?, 'confirmed', 'admin', ?)`,
-        slot, phone, name, prev ? prev.token : newToken(), Date.now());
+      this.sql.exec(`INSERT INTO regs (slot_id, phone, name, token, status, source, created, kind) VALUES (?, ?, ?, ?, 'confirmed', 'admin', ?, ?)`,
+        slot, phone, name, prev ? prev.token : newToken(), Date.now(), kind);
       return null;
     });
     return res || this.adminData();
@@ -275,7 +291,7 @@ export class Store extends DurableObject {
   confirmReg(id) { this.sql.exec(`UPDATE regs SET status = 'confirmed' WHERE id = ?`, id); return this.adminData(); }
 
   exportRows() {
-    return this.sql.exec(`SELECT s.day, s.block, s.start, s."end" AS "end", s.hours, r.name, r.phone, r.status, r.created
+    return this.sql.exec(`SELECT s.day, s.block, s.start, s."end" AS "end", s.hours, r.name, r.phone, r.status, r.created, r.kind
       FROM regs r JOIN slots s ON s.id = r.slot_id ORDER BY s.day, s.block, r.name`).toArray();
   }
 
@@ -422,15 +438,31 @@ const DAYS_HR = ['ned', 'pon', 'uto', 'sri', 'čet', 'pet', 'sub'];
 const hrDate = d => `${+d.slice(8, 10)}.${+d.slice(5, 7)}.${d.slice(0, 4)}.`;
 function exportCsv(rows) {
   const q = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const out = [['Datum', 'Dan', 'Tjedan', 'Blok', 'Vrijeme', 'Sati', 'Ime i prezime', 'Mobitel', 'Status', 'Prijavljeno']];
+  const out = [['Datum', 'Dan', 'Tjedan', 'Blok', 'Vrijeme', 'Sati', 'Ime i prezime', 'Mobitel', 'Servis', 'Status', 'Prijavljeno']];
   for (const r of rows) {
     out.push([hrDate(r.day), DAYS_HR[new Date(r.day + 'T12:00:00Z').getUTCDay()], isoWeek(r.day).slice(-2), r.block,
-      `${r.start}–${r.end}`, String(r.hours).replace('.', ','), r.name, formatPhone(r.phone),
+      `${r.start}–${r.end}`, String(r.hours).replace('.', ','), r.name, formatPhone(r.phone), KIND_HR[r.kind] || r.kind,
       r.status === 'pending' ? 'čeka potvrdu' : 'potvrđeno',
       new Date(r.created).toLocaleString('hr-HR', { timeZone: 'Europe/Zagreb' })]);
   }
   // semicolons and a BOM: Excel with Croatian settings opens it with the right columns and letters
   return '﻿' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';
+}
+
+const KIND_HR = { student: 'Student (SCRI)', ucenik: 'Učenik (Dom mladih)', drugo: 'Drugo' };
+// Hours for the services' payroll: per person and calendar year (December and January are settled separately),
+// regular and +50 % (night 22–06, Sundays, holidays), with an estimate of the net pay.
+function payrollCsv(people) {
+  const q = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const n = v => String(Math.round(v * 100) / 100).replace('.', ',');
+  const out = [['Ime i prezime', 'Mobitel', 'Servis', 'Godina', 'Redovni sati', 'Sati +50 %', 'Ukupno sati',
+    `Procjena neto (EUR, ${n(PAY_BASE)} / ${n(PAY_PLUS)})`]];
+  for (const p of people) {
+    for (const [y, h] of Object.entries(p.pay).sort()) {
+      out.push([p.name, p.phone_fmt, KIND_HR[p.kind] || p.kind, y, n(h.reg), n(h.plus), n(h.reg + h.plus), n(h.reg * PAY_BASE + h.plus * PAY_PLUS)]);
+    }
+  }
+  return '\uFEFF' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';
 }
 
 // For the organizer's workbook (sheet "Prijave", columns A–C from row 5): name, date as 2026-12-10
@@ -515,9 +547,10 @@ export default {
       if (!name) return json({ error: 'name' }, 400);
       const phone = normalizePhone(b.phone);
       if (!phone) return json({ error: 'phone' }, 400);
+      if (b.kind !== 'student' && b.kind !== 'ucenik') return json({ error: 'kind' }, 400);
       const ids = Array.isArray(b.slots) ? [...new Set(b.slots.map(String))] : [];
       if (!ids.length || ids.length > 40 || ids.some(id => !/^\d{4}-\d{2}-\d{2}-[AB]$/.test(id))) return json({ error: 'no_slots' }, 400);
-      const res = await store.signUp({ name, phone, slots: ids }, ip);
+      const res = await store.signUp({ name, phone, kind: b.kind, slots: ids }, ip);
       return json(res, res.status || 200);
     }
 
@@ -543,6 +576,11 @@ export default {
         return new Response(exportCsv(await store.exportRows()), { headers: {
           'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
           'Content-Disposition': 'attachment; filename="prijave-advent-2026.csv"' } });
+      }
+      if (route === 'obracun.csv' && method === 'GET') {
+        return new Response(payrollCsv(await store.payrollRows()), { headers: {
+          'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
+          'Content-Disposition': 'attachment; filename="obracun-sati-advent-2026.csv"' } });
       }
       if (route === 'export-tablica.csv' && method === 'GET') {
         return new Response(sheetCsv(await store.exportRows()), { headers: {
@@ -587,7 +625,8 @@ export default {
         const name = validName(b.name), phone = normalizePhone(b.phone);
         if (!name) return json({ error: 'name' }, 400);
         if (!phone) return json({ error: 'phone' }, 400);
-        const res = await store.addReg({ slot: String(b.slot || ''), name, phone, force: !!b.force });
+        const kind = KINDS.includes(b.kind) ? b.kind : 'drugo';
+        const res = await store.addReg({ slot: String(b.slot || ''), name, phone, kind, force: !!b.force });
         return json(res, res.status || 200);
       }
       m = route.match(/^regs\/(\d+)(\/confirm)?$/);

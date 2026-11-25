@@ -41,6 +41,12 @@ main { max-width: 640px; margin: 0 auto; padding: 0 16px 120px; }
 .day .date { font-weight: 700; margin-bottom: 8px; display: flex; gap: 8px; align-items: baseline; }
 .day .date small { color: var(--muted); font-weight: 400; }
 .day .event { font-size: 14px; color: var(--muted); margin: -4px 0 8px; }
+.kind { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kind label { border: 2px solid var(--line); border-radius: 12px; padding: 12px; text-align: center; font: 800 19px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.kind input { position: absolute; opacity: 0; }
+.kind label:has(input:checked) { border-color: var(--accent); background: var(--sel-soft); }
+.kind label:has(input:focus-visible) { outline: 3px solid var(--lamp); }
 .note-tag { font: 800 13px/1 'Barlow Condensed', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 99px; padding: 3px 8px; }
 .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .slot { text-align: left; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 9px 10px;
@@ -102,9 +108,11 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="card">
       <h2>Kako funkcionira</h2>
       <ul class="rules">
-        <li>Samo za osobe s navršenih <b>18 godina</b>.</li>
+        <li>Za <b>studente</b> i <b>punoljetne učenike</b> (18+).</li>
+        <li>Učenici smiju raditi samo za zimskih praznika, <b>od 24. 12.</b> Studenti mogu od početka, 10. 12.</li>
         <li>Svaki dan ima dva bloka: <b>A</b> (prijepodne) i <b>B</b> (večer).</li>
         <li>Najviše <b>jedan blok dnevno</b> i najviše <b id="maxw">30</b> <b>sati tjedno</b>.</li>
+        <li>Nakon večernjeg bloka B ne možeš sutradan raditi jutarnji blok A (obavezan odmor od 12 sati).</li>
         <li>Termin se zatvara čim je popunjen, pa vrijedi onaj tko se prvi prijavi.</li>
         <li id="cancelrule"></li>
       </ul>
@@ -112,6 +120,14 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="card" id="termsCard" hidden>
       <h2>Satnica i uvjeti</h2>
       <div class="terms" id="terms"></div>
+    </div>
+    <div class="card kindcard">
+      <h2>Ja sam</h2>
+      <div class="kind" role="radiogroup" aria-label="Ja sam">
+        <label><input type="radio" name="kind" value="student"> Student</label>
+        <label><input type="radio" name="kind" value="ucenik"> Učenik 18+</label>
+      </div>
+      <p class="note" id="kindNote">Odaberi, pa onda termine.</p>
     </div>
     <div id="weeks"></div>
 
@@ -199,6 +215,9 @@ function errorText(r) {
     case 'full': return s ? `Termin ${slotLabel(s)} je upravo popunjen. Odaberi neki drugi.` : 'Jedan od termina je upravo popunjen.';
     case 'past': return s ? `Termin ${slotLabel(s)} je već počeo.` : 'Jedan od termina je već počeo.';
     case 'one_per_day': return `Na dan ${hrDate(r.day)} već imaš prijavljen termin. Dopušten je jedan blok dnevno.`;
+    case 'rest': return `Na dan ${hrDate(r.day)} ne možeš ujutro jer prethodnu večer radiš blok B. Obavezan je odmor od 12 sati.`;
+    case 'pupil_dates': return 'Učenici smiju raditi samo za zimskih praznika, od 24. 12. Odaberi kasnije termine.';
+    case 'kind': return 'Odaberi jesi li student ili učenik.';
     case 'week_hours': return `S ovim terminima imao/la bi ${hrs(r.hours)} u ${+r.week.slice(-2)}. tjednu. Najviše je ${state ? state.max_week : 30} h tjedno.`;
     case 'name': return 'Upiši ime i prezime.';
     case 'phone': return 'Upiši ispravan broj mobitela, npr. 091 234 5678.';
@@ -270,8 +289,9 @@ function render() {
       html += `<div class="day"><div class="date">${dayLabel(day)}${note ? `<span class="note-tag">${esc(note.toLowerCase() === 'koncert' ? 'koncert' : note)}</span>` : ''}${long ? '<small>duža večernja smjena</small>' : ''}</div>${slots[0].event ? `<div class="event">${esc(slots[0].event)}</div>` : ''}<div class="slots">`;
       for (const s of slots.sort((x, y) => x.block.localeCompare(y.block))) {
         const past = startMs(s) <= now(), full = s.free <= 0, sel = selected.has(s.id);
-        const dis = !open || past || (full && !sel);
-        const free = past ? 'Završeno' : full ? 'Popunjeno' : freeText(s.free);
+        const pupilNo = kind() === 'ucenik' && s.day < state.pupil_from;
+        const dis = !open || past || (full && !sel) || pupilNo;
+        const free = past ? 'Završeno' : full ? 'Popunjeno' : pupilNo ? 'Samo studenti' : freeText(s.free);
         html += `<button type="button" class="slot${full ? ' isfull' : ''}" data-id="${s.id}" aria-pressed="${sel}" ${dis ? 'disabled' : ''}>
           <b>Blok ${s.block}</b><span class="t">${s.start}–${s.end} · ${hrs(s.hours)}</span><div class="free">${free}</div></button>`;
       }
@@ -295,12 +315,26 @@ function renderBar() {
   });
 }
 
+const kind = () => (document.querySelector('input[name=kind]:checked') || {}).value || '';
+document.querySelectorAll('input[name=kind]').forEach(r => r.onchange = () => {
+  if (kind() === 'ucenik') for (const id of [...selected]) if (byId(id).day < state.pupil_from) selected.delete(id);
+  $('kindNote').textContent = kind() === 'ucenik'
+    ? 'Prijava preko Učeničkog servisa Dom mladih Rijeka. Možeš birati termine od 24. 12.'
+    : 'Prijava preko Student servisa Rijeka (SCRI). Možeš birati sve termine.';
+  render();
+});
+const nextDay = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 $('weeks').addEventListener('click', e => {
   const btn = e.target.closest('.slot');
   if (!btn || btn.disabled) return;
+  if (!kind()) { document.querySelector('.kindcard').scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('Prvo odaberi jesi li student ili učenik.'); }
   const s = byId(btn.dataset.id);
   if (selected.has(s.id)) selected.delete(s.id);
   else {
+    // 12 hours of rest: no morning block the day after an evening block
+    const clash = [...selected].map(byId).find(x => (s.block === 'A' && x.block === 'B' && x.day === nextDay(s.day, -1))
+      || (s.block === 'B' && x.block === 'A' && x.day === nextDay(s.day, 1)));
+    if (clash) return toast(`Nakon večernjeg bloka B nema jutarnjeg bloka A sutradan (odmor od 12 sati). Već imaš ${slotLabel(clash)}.`);
     // one block a day: picking the other block of the same day swaps them
     const other = [...selected].find(id => byId(id).day === s.day);
     if (other) selected.delete(other);
@@ -342,7 +376,7 @@ $('form').addEventListener('submit', async e => {
   if (!$('consent').checked) return err(errorText({ error: 'consent' }));
   $('send').disabled = true; $('send').textContent = 'Šaljem…';
   const r = await api('/api/prijava', { method: 'POST', body: JSON.stringify({
-    name: $('name').value, phone: $('phone').value, slots: [...selected],
+    name: $('name').value, phone: $('phone').value, slots: [...selected], kind: kind(),
     adult: true, consent: true, website: $('website').value }) });
   $('send').disabled = false; $('send').textContent = 'Pošalji prijavu';
   if (r.token) {
@@ -378,7 +412,12 @@ function showMine(data, token, fresh) {
     : (data.name ? `${esc(data.name)}, ` : '') + (fresh
       ? (data.manual ? 'tvoja prijava čeka potvrdu organizatora. Termini su ti rezervirani.' : 'tvoji termini su potvrđeni.')
       : 'ovo su tvoji termini.')
-      + (data.cancel_hours > 0 ? ` Otkazati možeš najkasnije ${data.cancel_hours} h prije početka.` : '');
+      + (data.cancel_hours > 0 ? ` Otkazati možeš najkasnije ${data.cancel_hours} h prije početka.` : '')
+      + (!n ? '' : data.kind === 'ucenik'
+        ? '<br><br><b>Važno:</b> moraš biti učlanjen/a u Učenički servis Dom mladih Rijeka za školsku godinu 2026./2027. Ugovor se naručuje do 18. 12., inače ne možeš početi raditi 24. 12.'
+        : data.kind === 'student'
+        ? '<br><br><b>Važno:</b> prije prvog rada generiraj e-ugovor na rad.uniri.hr (Student servis Rijeka, AAI@EduHr račun). Bez ugovora ne smiješ raditi, a naknadno se ne može izdati.'
+        : '');
   let total = 0;
   $('mineList').innerHTML = data.regs.map(r => {
     total += r.hours;
