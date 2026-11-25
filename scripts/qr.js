@@ -1,4 +1,4 @@
-// QR code for the flyer, made on your own computer: npm run qr -- https://advent-prijave.<račun>.workers.dev/
+// QR code for the flyer, made on your own computer: npm run qr -- https://echoes-of-the-island.<račun>.workers.dev/
 // Writes qr/qr-prijave.svg (vector, best for print) and qr/qr-prijave.png (about 1500 × 1500 px, 300 dpi).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { qrSvg, qrPng } from '../src/qr.js';

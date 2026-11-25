@@ -39,16 +39,16 @@ Kasnije promjene:
 ## Puštanje na internet (Cloudflare Workers, besplatni plan)
 Cloudflare sam objavljuje aplikaciju iz ovog GitHub repozitorija.
 
-1. Na dash.cloudflare.com: **Workers & Pages** → **Create** → **Import a repository** → odaberite repozitorij **Echoes-of-The-Island**. Cloudflare čita `wrangler.toml` i napravi Worker **`advent-prijave`**.
+1. Na dash.cloudflare.com: **Workers & Pages** → **Create** → **Import a repository** → odaberite repozitorij **Echoes-of-The-Island**. Cloudflare čita `wrangler.toml` i napravi Worker **`echoes-of-the-island`**.
 2. **Settings → Variables and Secrets → Add** → vrsta **Secret**, naziv `ADMIN_PASSWORD`, vrijednost je vaša lozinka (dugačka, ne ista kao drugdje).
-3. Stranica radi na `https://advent-prijave.<vaš-račun>.workers.dev/`. HTTPS je uključen sam od sebe.
+3. Stranica radi na `https://echoes-of-the-island.<vaš-račun>.workers.dev/`. HTTPS je uključen sam od sebe.
 4. *(Po želji)* Vlastita domena: **Settings → Domains & Routes → Add → Custom domain**, npr. `prijave.vasa-domena.hr`. Zatim dodajte varijablu `PUBLIC_URL` = `https://prijave.vasa-domena.hr/` (vrsta Text), da QR kod vodi na nju.
 5. Otvorite `/admin`, upišite lozinku, učitajte svoj CSV termina i ispunite postavke.
 
 ## QR kod za letak
 - U `/admin` → **Postavke** → **QR kod za letak** preuzmite **SVG** (vektorski, najbolji za tisak) ili **PNG** (≈1500 px ili ≈3000 px, 300 dpi). QR kod vodi na adresu na kojoj je stranica otvorena (ili na `PUBLIC_URL`).
 - Izravne adrese: `/qr.svg` i `/qr.png`.
-- Na računalu: `npm install` pa `npm run qr -- https://advent-prijave.<vaš-račun>.workers.dev/`. Datoteke se spreme u mapu `qr/`.
+- Na računalu: `npm install` pa `npm run qr -- https://echoes-of-the-island.<vaš-račun>.workers.dev/`. Datoteke se spreme u mapu `qr/`.
 - Prije tiska skenirajte QR kod mobitelom.
 
 ## Privatnost
@@ -62,7 +62,7 @@ Cloudflare sam objavljuje aplikaciju iz ovog GitHub repozitorija.
 2. **Brisanje**:
    - Automatski: na datum iz postavke „Automatsko brisanje” (zadano 31. 1. 2027.) brišu se sve prijave i zatvaraju se prijave.
    - Odmah: `/admin` → **Postavke** → **Brisanje podataka** → upišite `OBRIŠI` → **Obriši sve prijave**.
-3. **Potpuno uklanjanje** (po želji): na Cloudflareu **Workers & Pages → advent-prijave → Settings → Delete**. To briše i bazu.
+3. **Potpuno uklanjanje** (po želji): na Cloudflareu **Workers & Pages → echoes-of-the-island → Settings → Delete**. To briše i bazu.
 
 ## Lokalno pokretanje i testovi
 ```bash
