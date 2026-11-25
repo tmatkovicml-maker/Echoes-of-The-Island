@@ -82,6 +82,16 @@ Cloudflare sam objavljuje aplikaciju iz ovog GitHub repozitorija.
 - Na računalu: `npm install` pa `npm run qr -- https://echoes-of-the-island.<vaš-račun>.workers.dev/`. Datoteke se spreme u mapu `qr/`.
 - Prije tiska skenirajte QR kod mobitelom.
 
+## Letak i naljepnice za stolove (mapa `tisak/`)
+Gotove datoteke s QR kodovima koji vode na `echoes-of-the-island.t-matkovicml.workers.dev`:
+- `letak-A5.pdf`: letak za prijave smjena (A5), za ispis u uredu ili za pregled.
+- `letak-A5-za-tiskaru.pdf`: isti letak s 3 mm za obrez (154 × 216 mm), za tiskaru.
+- `naljepnica-90mm.pdf`: naljepnica za stol za QR narudžbe, 90 × 90 mm, s 2 mm za obrez.
+- `naljepnice-A4-6kom.pdf`: 6 naljepnica na A4 s isprekidanim linijama za rezanje (samoljepivi papir, ili izrezati i plastificirati).
+- `.png` datoteke su pregledi.
+
+Ako stranica dobije drugu adresu (vlastita domena), napravite datoteke ponovno: `node scripts/tisak.js https://nova-adresa/` (treba Playwright). Prije tiska skenirajte QR kod mobitelom. Tamna pozadina troši puno boje, pa je za veće naklade bolje tiskati u tiskari.
+
 ## Privatnost
 - Prijave smjena: prikuplja se samo ime i prezime, broj mobitela i odabrani termini. Narudžbe: stavke, iznos, način plaćanja i po želji ime za prozivanje i napomena. Uz to se za ograničenje broja zahtjeva čuva IP adresa, najviše jedan dan.
 - Javni dio ne prikazuje ni imena ni brojeve, nego samo broj slobodnih mjesta. Na privatnoj poveznici osoba vidi samo svoje termine.
@@ -115,5 +125,6 @@ npm run test:server         # pravi poslužitelj (wrangler dev): istovremene pri
 - `Jelovnik.csv`: početni jelovnik
 - `src/admin.html`: stranica za organizatora
 - `src/qr.js` i `scripts/qr.js`: QR kod (SVG i PNG)
+- `scripts/tisak.js` i `tisak/`: letak i naljepnice za tisak
 - `public/`: logo i fontovi
 - `test/`: testovi
