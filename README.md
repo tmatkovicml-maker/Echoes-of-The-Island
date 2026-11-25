@@ -98,6 +98,18 @@ Gotove datoteke s QR kodovima koji vode na `echoes-of-the-island.t-matkovicml.wo
 
 Ako stranica dobije drugu adresu (vlastita domena), napravite datoteke ponovno: `node scripts/tisak.js https://nova-adresa/` (treba Playwright). Prije tiska skenirajte QR kod mobitelom. Tamna pozadina troši puno boje, pa je za veće naklade bolje tiskati u tiskari.
 
+## Promo letci i logo (mape `tisak/promo/` i `tisak/logo/`)
+- **Promo letci A5** (svaki i u inačici „-za-tiskaru” s 3 mm za obrez). Svi imaju QR kod za jelovnik i narudžbe mobitelom.
+  - `advent`: „Zimska kućica na Trgu”, jelovnik i koncerti na Trgu.
+  - `bozic`: „Badnjak do 3 ujutro”, Badnjak, Božić, Dellboys i studentska večer.
+  - `novagodina`: „Doček uz SuperCover Band”, zadnji tjedan i radno vrijeme.
+- **Logo**:
+  - `logo-winter-edition.png` (prozirna podloga) i `-tamna-podloga.png`: logo s natpisom Winter Edition;
+  - `logo-badge-advent.png`: okrugli znak za društvene mreže i naljepnice;
+  - `logo-roza.svg`, `logo-krem.svg` i `logo-crni.svg`: vektorski logo u tri boje (krem za tamnu podlogu, crni za jednobojni tisak).
+- Datumi koncerata su program Adventa na Trgu RH iz tablice planiranja. Prije tiska provjerite ih s organizatorom programa.
+- Nove datoteke: `node scripts/promo.js` (treba Playwright).
+
 ## Privatnost
 - Prijave smjena: prikuplja se samo ime i prezime, broj mobitela i odabrani termini. Narudžbe: stavke, iznos, način plaćanja i po želji ime za prozivanje i napomena. Uz to se za ograničenje broja zahtjeva čuva IP adresa, najviše jedan dan.
 - Javni dio ne prikazuje ni imena ni brojeve, nego samo broj slobodnih mjesta. Na privatnoj poveznici osoba vidi samo svoje termine.
@@ -131,6 +143,6 @@ npm run test:server         # pravi poslužitelj (wrangler dev): istovremene pri
 - `Jelovnik.csv`: početni jelovnik
 - `src/admin.html`: stranica za organizatora
 - `src/qr.js` i `scripts/qr.js`: QR kod (SVG i PNG)
-- `scripts/tisak.js` i `tisak/`: letak i naljepnice za tisak
+- `scripts/tisak.js`, `scripts/promo.js` i `tisak/`: letci, naljepnice, promo letci i logo
 - `public/`: logo i fontovi
 - `test/`: testovi
