@@ -14,19 +14,18 @@ Mala web aplikacija preko koje punoljetni učenici sami biraju smjene u adventsk
 - Zaštita od zlouporabe: najviše 15 prijava po IP adresi u 10 minuta, skriveno polje (honeypot) za botove i 10 pogrešnih lozinki po IP adresi u 15 minuta.
 
 ## Termini
-Početno je učitano 48 termina: svaki dan blok **A 09:00–16:00 (7 h, 1 osoba)** i blok **B 16:00–24:00 (8 h, 2 osobe)**. Blok B traje do 03:00 (11 h) na 24.12., 27.12. i 31.12.
+Početni termini učitavaju se iz **`Termini_prijave.csv`** (48 termina, ukupno 86 mjesta) kad je baza prazna:
+- **Običan dan:** blok A (09:00–16:00, 7 h) ima 1 mjesto, a blok B (16:00–24:00, 8 h) 2 mjesta.
+- **Koncertni dani** (10., 12., 26., 27., 29., 30. i 31. 12.): A ima 2 mjesta, a B 3 mjesta. Na stranici su označeni oznakom „koncert”.
+- Blok B traje do 03:00 (11 h) na 24., 27. i 31. 12.
 
-**Vaš `Termini_prijave.csv`** (s koncertnim danima: A=2, B=3) učitajte u `/admin` → **Postavke** → **Termini iz CSV-a**. Stupci se prepoznaju po nazivima u bilo kojem redoslijedu, a razdjelnik može biti `;` ili `,`:
-
-| Datum | Blok | Od | Do | Sati | Mjesta |
-|---|---|---|---|---|---|
-| 10.12.2026. | A | 09:00 | 16:00 | 7 | 1 |
-
-- Umjesto stupaca Od i Do može biti jedan stupac **Vrijeme** („09:00–16:00”).
-- Bez stupca **Sati** sati se računaju iz vremena.
-- Primjer je u datoteci `termini-primjer.csv`.
-- Postojeće prijave ostaju. Termin na kojem već ima prijava ne može se maknuti, a broj mjesta može se mijenjati.
-- Broj mjesta za pojedini termin može se promijeniti i izravno u popisu termina.
+Kasnije promjene:
+- Broj mjesta za pojedini termin mijenja se izravno u popisu termina u `/admin`.
+- Za veće izmjene: `/admin` → **Postavke** → **Termini iz CSV-a**. Datoteka je istog oblika kao `Termini_prijave.csv`.
+  - Stupci se prepoznaju po nazivima: Datum, Blok, Vrijeme (ili Od i Do), Sati, Mjesta i po želji Tip dana.
+  - Ostali stupci (Dan, Naziv termina) se zanemaruju.
+  - Postojeće prijave ostaju. Termin na kojem već ima prijava ne može se maknuti.
+- Ako promijenite `Termini_prijave.csv` u repozitoriju, to vrijedi samo za novu, praznu bazu. Na postojećoj stranici datoteku učitajte u adminu.
 
 ## Postavke (`/admin` → Postavke)
 | Postavka | Zadano | Značenje |
@@ -70,12 +69,13 @@ Cloudflare sam objavljuje aplikaciju iz ovog GitHub repozitorija.
 npm install
 echo 'ADMIN_PASSWORD=test' > .dev.vars
 npm run dev                 # http://localhost:8787  i  /admin (lozinka: test)
-npm test                    # pravila: mobitel, ISO tjedni, 30 h, jedan blok dnevno, CSV
+npm test                    # pravila: mobitel, ISO tjedni, 30 h, jedan blok dnevno, CSV termina
 npm run test:server         # pravi poslužitelj (wrangler dev): istovremene prijave, otkazivanje, admin, izvoz, QR
 ```
 
 ## Datoteke
 - `src/index.js`: poslužitelj (Worker) i baza (Durable Object, SQLite)
+- `Termini_prijave.csv`: početni termini
 - `src/rules.js`: pravila (mobitel, tjedni, 30 h, jedan blok dnevno, CSV termina)
 - `src/public.html`: stranica za učenike
 - `src/admin.html`: stranica za organizatora

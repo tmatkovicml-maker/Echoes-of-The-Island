@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizePhone, isoWeek, checkChoice, defaultSlots, parseSlotsCsv, hoursBetween } from '../src/rules.js';
+import { readFileSync } from 'node:fs';
+import { normalizePhone, isoWeek, checkChoice, parseSlotsCsv, hoursBetween } from '../src/rules.js';
 
 test('phone numbers are normalized to one form', () => {
   for (const v of ['091 234 5678', '+385 91 234 5678', '00385912345678', '385912345678', '091/234-5678', '+385 (0)91 234 5678'])
@@ -19,13 +20,20 @@ test('ISO weeks of the season are 50–53', () => {
   assert.equal(isoWeek('2027-01-02'), '2026-W53');
 });
 
-test('starting shifts: 24 days, 48 shifts, long nights 11 h', () => {
-  const s = defaultSlots();
+test('the organizer\'s Termini_prijave.csv: 24 days, 48 shifts, concert days, long nights', () => {
+  const s = parseSlotsCsv(readFileSync(new URL('../Termini_prijave.csv', import.meta.url), 'utf8'));
+  const by = id => s.find(x => x.id === id);
   assert.equal(s.length, 48);
   assert.equal(s[0].id, '2026-12-10-A'); assert.equal(s.at(-1).id, '2027-01-02-B');
-  assert.equal(s.find(x => x.id === '2026-12-10-A').hours, 7);
-  assert.equal(s.find(x => x.id === '2026-12-10-B').hours, 8);
-  for (const d of ['2026-12-24', '2026-12-27', '2026-12-31']) assert.equal(s.find(x => x.id === `${d}-B`).hours, 11);
+  assert.deepEqual([by('2026-12-10-A').capacity, by('2026-12-10-B').capacity, by('2026-12-10-A').note], [2, 3, 'Koncert']);
+  assert.deepEqual([by('2026-12-11-A').capacity, by('2026-12-11-B').capacity, by('2026-12-11-A').note], [1, 2, '']);
+  assert.deepEqual(s.filter(x => x.note === 'Koncert' && x.block === 'A').map(x => x.day.slice(5)),
+    ['12-10', '12-12', '12-26', '12-27', '12-29', '12-30', '12-31']);
+  for (const [d, cap] of [['2026-12-24', 2], ['2026-12-27', 3], ['2026-12-31', 3]]) {
+    assert.equal(by(`${d}-B`).hours, 11); assert.equal(by(`${d}-B`).end, '03:00'); assert.equal(by(`${d}-B`).capacity, cap);
+  }
+  assert.equal(by('2026-12-10-B').hours, 8);
+  assert.equal(s.reduce((n, x) => n + x.capacity, 0), 86);
   assert.equal(hoursBetween('16:00', '00:00'), 8);
 });
 

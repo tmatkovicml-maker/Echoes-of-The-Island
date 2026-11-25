@@ -42,6 +42,8 @@ const free = async id => (await call('/api/stanje')).data.slots.find(s => s.id =
 test('public state: 48 shifts, nothing personal', async () => {
   const { data } = await call('/api/stanje');
   assert.equal(data.slots.length, 48);
+  const first = data.slots.find(s => s.id === '2026-12-10-B');                 // from Termini_prijave.csv
+  assert.deepEqual([first.capacity, first.free, first.note], [3, 3, 'Koncert']);
   assert.equal(data.open, true);
   assert.ok(data.slots.every(s => !('taken' in s) || s.taken === undefined));
 });

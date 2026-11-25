@@ -20,3 +20,9 @@ new_sqlite_classes = ["Store"]
 # Logo and the Barlow fonts (served from here, no Google Fonts)
 [assets]
 directory = "./public"
+
+# Termini_prijave.csv is bundled as text (the starting shifts)
+[[rules]]
+type = "Text"
+globs = ["**/*.csv"]
+fallthrough = true

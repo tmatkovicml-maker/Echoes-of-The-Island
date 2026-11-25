@@ -26,9 +26,10 @@ import { DurableObject } from 'cloudflare:workers';
 import PUBLIC_PAGE from './public.html';
 import ADMIN_PAGE from './admin.html';
 import { qrSvg, qrPng } from './qr.js';
+import TERMINI_CSV from '../Termini_prijave.csv';   // the organizer's 48 shifts, loaded into an empty database
 import {
   MAX_WEEK_HOURS, normalizePhone, formatPhone, isoWeek, isDay, checkChoice, weekHours,
-  defaultSlots, parseSlotsCsv, slotStartMs,
+  parseSlotsCsv, slotStartMs,
 } from './rules.js';
 
 const MINUTE = 60 * 1000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
@@ -58,14 +59,15 @@ export class Store extends DurableObject {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS limits (k TEXT NOT NULL, at INTEGER NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS slots (id TEXT PRIMARY KEY, day TEXT NOT NULL, block TEXT NOT NULL,
-      start TEXT NOT NULL, "end" TEXT NOT NULL, hours REAL NOT NULL, capacity INTEGER NOT NULL)`);
+      start TEXT NOT NULL, "end" TEXT NOT NULL, hours REAL NOT NULL, capacity INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '')`);
     // one row per person per shift; token = the private link of the sign-up it was made with
     this.sql.exec(`CREATE TABLE IF NOT EXISTS regs (id INTEGER PRIMARY KEY AUTOINCREMENT, slot_id TEXT NOT NULL,
       phone TEXT NOT NULL, name TEXT NOT NULL, token TEXT NOT NULL, status TEXT NOT NULL, source TEXT NOT NULL, created INTEGER NOT NULL,
       UNIQUE (slot_id, phone))`);
     this.sql.exec('CREATE INDEX IF NOT EXISTS regs_phone ON regs (phone)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS regs_token ON regs (token)');
-    if (this.sql.exec('SELECT COUNT(*) AS n FROM slots').one().n === 0) this.insertSlots(defaultSlots());
+    if (!this.sql.exec('PRAGMA table_info(slots)').toArray().some(c => c.name === 'note')) this.sql.exec(`ALTER TABLE slots ADD COLUMN note TEXT NOT NULL DEFAULT ''`);
+    if (this.sql.exec('SELECT COUNT(*) AS n FROM slots').one().n === 0) this.insertSlots(parseSlotsCsv(TERMINI_CSV));
   }
 
   // ---- settings ----
@@ -91,7 +93,7 @@ export class Store extends DurableObject {
 
   // ---- shifts ----
   slots() {
-    return this.sql.exec(`SELECT s.id, s.day, s.block, s.start, s."end" AS "end", s.hours, s.capacity,
+    return this.sql.exec(`SELECT s.id, s.day, s.block, s.start, s."end" AS "end", s.hours, s.capacity, s.note,
       (SELECT COUNT(*) FROM regs r WHERE r.slot_id = s.id) AS taken FROM slots s ORDER BY s.day, s.block`).toArray();
   }
   slot(id) {
@@ -100,9 +102,9 @@ export class Store extends DurableObject {
   taken(id) { return this.sql.exec('SELECT COUNT(*) AS n FROM regs WHERE slot_id = ?', id).one().n; }
   insertSlots(list) {
     for (const s of list) {
-      this.sql.exec(`INSERT INTO slots (id, day, block, start, "end", hours, capacity) VALUES (?, ?, ?, ?, ?, ?, ?)
+      this.sql.exec(`INSERT INTO slots (id, day, block, start, "end", hours, capacity, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET day = excluded.day, block = excluded.block, start = excluded.start, "end" = excluded."end",
-        hours = excluded.hours, capacity = excluded.capacity`, s.id, s.day, s.block, s.start, s.end, s.hours, s.capacity);
+        hours = excluded.hours, capacity = excluded.capacity, note = excluded.note`, s.id, s.day, s.block, s.start, s.end, s.hours, s.capacity, s.note || '');
     }
   }
   personShifts(phone) {

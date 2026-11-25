@@ -54,6 +54,7 @@ main { max-width: 640px; margin: 0 auto; padding: 0 16px 120px; }
 .day { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 8px 0; }
 .day .date { font-weight: 700; margin-bottom: 8px; display: flex; gap: 8px; align-items: baseline; }
 .day .date small { color: var(--muted); font-weight: 400; }
+.note-tag { font: 800 13px/1 'Barlow Condensed', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 99px; padding: 3px 8px; }
 .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .slot { text-align: left; border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 9px 10px;
   font: inherit; cursor: pointer; min-height: 72px; touch-action: manipulation; }
@@ -278,7 +279,8 @@ function render() {
     html += `<div class="week"><h3>${w}. tjedan · ${range}</h3><span class="hrs${h >= state.max_week ? ' full' : ''}" data-week="${w}">${hrs(h)} / ${state.max_week} h</span></div>`;
     for (const [day, slots] of days) {
       const long = slots.some(s => s.block === 'B' && s.end !== '00:00' && s.end < s.start);
-      html += `<div class="day"><div class="date">${dayLabel(day)}${long ? '<small>duža večernja smjena</small>' : ''}</div><div class="slots">`;
+      const note = slots.map(s => s.note).find(Boolean);
+      html += `<div class="day"><div class="date">${dayLabel(day)}${note ? `<span class="note-tag">${esc(note.toLowerCase() === 'koncert' ? 'koncert' : note)}</span>` : ''}${long ? '<small>duža večernja smjena</small>' : ''}</div><div class="slots">`;
       for (const s of slots.sort((x, y) => x.block.localeCompare(y.block))) {
         const past = startMs(s) <= now(), full = s.free <= 0, sel = selected.has(s.id);
         const dis = !open || past || (full && !sel);

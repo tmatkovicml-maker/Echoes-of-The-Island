@@ -152,7 +152,7 @@ textarea { min-height: 110px; }
 
     <div class="card">
       <h2>Termini iz CSV-a</h2>
-      <p class="note">Zamjenjuje termine onima iz datoteke (npr. Termini_prijave.csv). Stupci: Datum, Blok, Od, Do (ili Vrijeme), Sati, Mjesta.
+      <p class="note">Zamjenjuje termine onima iz datoteke (npr. Termini_prijave.csv). Stupci: Datum, Blok, Od, Do (ili Vrijeme), Sati, Mjesta, po želji Tip dana.
         Prijave ostaju. Termin koji ima prijave ne može se maknuti.</p>
       <input type="file" id="csvFile" accept=".csv,text/csv,text/plain">
       <div id="csvErr" class="err" hidden style="margin-top:8px"></div>
@@ -251,7 +251,8 @@ function renderDays() {
     if (!fPast && day < today) continue;
     const shown = slots.filter(s => (!fFree || s.taken < s.capacity) && (!fPending || (regsBy[s.id] || []).some(r => r.status === 'pending')));
     if (!shown.length) continue;
-    html += `<div class="day"><h3>${dayLabel(day)}</h3>`;
+    const note = slots.map(s => s.note).find(Boolean);
+    html += `<div class="day"><h3>${dayLabel(day)}${note ? ` · ${esc(note)}` : ''}</h3>`;
     for (const s of shown) {
       const regs = regsBy[s.id] || [];
       const cls = s.taken >= s.capacity ? 'full' : s.taken === 0 ? 'empty' : '';

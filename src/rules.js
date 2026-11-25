@@ -45,26 +45,14 @@ export const hoursBetween = (start, end) => { let m = toMin(end) - toMin(start);
 // Shift start as a timestamp. December and January are always winter time in Croatia (UTC+1).
 export const slotStartMs = s => Date.parse(`${s.day}T${s.start}:00+01:00`);
 
-// ---- the starting shifts: 10.12.2026–02.01.2027, every day A 09–16 (1 person) and B 16–24 (2 people);
-// B lasts until 03:00 on 24.12., 27.12. and 31.12. The organizer's own CSV replaces these in /admin.
-export const SEASON_FIRST = '2026-12-10', SEASON_LAST = '2027-01-02';
-const LONG_NIGHTS = ['2026-12-24', '2026-12-27', '2026-12-31'];
-export function defaultSlots() {
-  const out = [];
-  for (let day = SEASON_FIRST; day <= SEASON_LAST; day = addDays(day, 1)) {
-    out.push(makeSlot(day, 'A', '09:00', '16:00', 1));
-    const long = LONG_NIGHTS.includes(day);
-    out.push(makeSlot(day, 'B', '16:00', long ? '03:00' : '00:00', 2));
-  }
-  return out;
-}
-export function makeSlot(day, block, start, end, capacity, hours) {
-  return { id: `${day}-${block}`, day, block, start, end, hours: hours || hoursBetween(start, end), capacity };
+export function makeSlot(day, block, start, end, capacity, hours, note = '') {
+  return { id: `${day}-${block}`, day, block, start, end, hours: hours || hoursBetween(start, end), capacity, note };
 }
 
 // ---- the organizer's CSV of shifts ----
 // The columns are recognized by their headings (any order, ";" or "," or tab):
-//   Datum (10.12.2026. / 2026-12-10 / 10.12.), Blok (A/B), Od + Do or Vrijeme ("09:00–16:00"), Sati, Mjesta.
+//   Datum (10.12.2026. / 2026-12-10 / 10.12.), Blok (A/B), Od + Do or Vrijeme ("09:00–16:00"), Sati, Mjesta,
+//   optional Tip dana ("Koncert" is shown to the students). Other columns (Dan, Naziv termina) are ignored.
 // Without Blok the block follows from the start time (before noon = A). Without Sati the hours follow from the times.
 const fold = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
 
@@ -115,6 +103,7 @@ export function parseSlotsCsv(text) {
   const iTime = find('vrijeme', 'time');
   const iHours = find('sati', 'hours', 'trajanje', 'h');
   const iCap = find('mjesta', 'kapacitet', 'broj osoba', 'osoba', 'capacity');
+  const iNote = find('tip dana', 'tip', 'vrsta dana', 'napomena');
   if (iDate < 0) throw new Error('Nema stupca s datumom (npr. "Datum").');
   if (iCap < 0) throw new Error('Nema stupca s brojem mjesta (npr. "Mjesta").');
 
@@ -140,7 +129,8 @@ export function parseSlotsCsv(text) {
     if (cap === null || cap < 0 || cap > 50 || !Number.isInteger(cap)) return errors.push(`${at}: neispravan broj mjesta "${r[iCap] || ''}"`);
     const h = iHours >= 0 && String(r[iHours] || '').trim() ? parseNum(r[iHours]) : hoursBetween(start, end);
     if (h === null || h <= 0 || h > 24) return errors.push(`${at}: neispravan broj sati "${r[iHours] || ''}"`);
-    slots.push(makeSlot(day, block, start, end, cap, h));
+    const note = iNote >= 0 ? String(r[iNote] || '').trim().slice(0, 40) : '';
+    slots.push(makeSlot(day, block, start, end, cap, h, /^obi[cč]an$/i.test(note) ? '' : note));
   });
   const seen = new Set();
   for (const s of slots) { if (seen.has(s.id)) errors.push(`Termin ${s.day} ${s.block} se ponavlja`); seen.add(s.id); }
