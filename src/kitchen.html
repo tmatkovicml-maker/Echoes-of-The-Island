@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="hr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Narudžbe · Echoes of the Island</title>
+<meta name="theme-color" content="#0C0F1D">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 Barlow, system-ui, sans-serif; }
+.cond, h1, h2 { font-family: "Barlow Condensed", Barlow, sans-serif; }
+header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; background: var(--card2); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5; }
+header img { width: 40px; height: 40px; }
+header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; flex: 1; }
+.btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); font: 800 17px/1 'Barlow Condensed', sans-serif; letter-spacing: .05em;
+  text-transform: uppercase; padding: 12px 14px; border-radius: 10px; cursor: pointer; min-height: 44px; touch-action: manipulation; }
+.btn.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.ready { background: var(--lamp); color: #0C0F1D; border-color: var(--lamp); }
+.btn.off { background: transparent; }
+.btn:focus-visible { outline: 3px solid var(--lamp); outline-offset: 2px; }
+.pill { font: 800 15px/1 'Barlow Condensed', sans-serif; letter-spacing: .1em; padding: 8px 12px; border-radius: 99px; text-transform: uppercase; }
+.pill.on { background: var(--lamp); color: #0C0F1D; } .pill.offp { background: var(--accent-soft); color: #FF8CC6; }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px; }
+@media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+.col h2 { margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.col h2 span { color: var(--ink); background: var(--card2); border-radius: 99px; padding: 0 10px; margin-left: 6px; }
+.col h2 span:empty { display: none; }
+.col.c-nova h2 { color: var(--accent); } .col.c-spremno h2 { color: var(--lamp); }
+.o { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+.c-nova .o { border-color: var(--accent); box-shadow: 0 0 12px rgba(255, 42, 150, .3); }
+.c-spremno .o { border-color: var(--lamp); }
+.o .top { display: flex; align-items: baseline; gap: 10px; }
+.o .n { font: 800 40px/1 'Barlow Condensed', sans-serif; }
+.o .who { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o .t { color: var(--muted); font-size: 15px; white-space: nowrap; }
+.o .t.late { color: #FF8CC6; font-weight: 700; }
+.o ul { list-style: none; margin: 8px 0; padding: 0; font-size: 20px; }
+.o li b { display: inline-block; min-width: 34px; color: var(--lamp); }
+.o .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 15px; color: var(--muted); }
+.tag { font: 800 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 5px 8px; border-radius: 8px; background: var(--card2); color: var(--ink); }
+.tag.age { background: var(--accent); color: var(--accent-ink); }
+.o .notes { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.o .acts { display: flex; gap: 8px; margin-top: 10px; }
+.o .acts .btn { flex: 1; }
+.o .acts .btn.x { flex: 0 0 auto; }
+.empty { color: var(--muted); padding: 10px 2px; }
+.done { padding: 0 12px 30px; }
+.done details summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: 8px 0; }
+.done table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.done td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+#stock { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 20; display: flex; justify-content: flex-end; }
+#stock .panel { width: min(420px, 100%); height: 100%; overflow: auto; background: var(--card2); padding: 16px; }
+#stock h2 { margin: 0 0 4px; font-size: 24px; text-transform: uppercase; letter-spacing: .06em; }
+.si { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.si .btn { min-width: 128px; }
+#login { max-width: 360px; margin: 80px auto; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+#login input { width: 100%; font: inherit; font-size: 22px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); letter-spacing: .2em; }
+.err { background: var(--accent-soft); color: #FF8CC6; border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-weight: 600; }
+.note { color: var(--muted); font-size: 15px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-weight: 600; z-index: 30; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<form id="login" hidden>
+  <h1 class="cond" style="margin:0 0 8px;text-transform:uppercase">Narudžbe</h1>
+  <label for="pin">PIN osoblja</label>
+  <input type="password" id="pin" inputmode="numeric" autocomplete="current-password" required>
+  <div id="loginErr" class="err" hidden></div>
+  <p><button class="btn go" type="submit" style="width:100%">Otvori</button></p>
+</form>
+
+<div id="app" hidden>
+<header>
+  <img src="/logo.svg" alt="">
+  <h1>Narudžbe</h1>
+  <span id="openPill" class="pill"></span>
+  <button class="btn" id="toggleOpen"></button>
+  <button class="btn" id="stockBtn">Rasprodano?</button>
+  <button class="btn" id="soundBtn">🔔 Zvuk</button>
+</header>
+<div class="cols">
+  <section class="col c-nova"><h2>Nove <span id="cnt-nova"></span></h2><div id="l-nova"></div></section>
+  <section class="col c-priprema"><h2>U pripremi <span id="cnt-priprema"></span></h2><div id="l-priprema"></div></section>
+  <section class="col c-spremno"><h2>Spremno <span id="cnt-spremno"></span></h2><div id="l-spremno"></div></section>
+</div>
+<div class="done"><details><summary id="doneSum">Završene (zadnja 2 sata)</summary><table id="doneList"></table></details></div>
+</div>
+
+<div id="stock" hidden><div class="panel">
+  <h2 class="cond">Dostupno na jelovniku</h2>
+  <p class="note">Što je rasprodano, gosti odmah ne vide na jelovniku.</p>
+  <div id="stockList"></div>
+  <p><button class="btn" id="stockClose" style="width:100%">Zatvori</button></p>
+</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const eur = n => n.toFixed(2).replace('.', ',') + ' €';
+const KEY = 'echoes-osoblje-pin';
+let pin = '', data = null, known = null, sound = false, audio, toastT, skew = 0;
+try { pin = localStorage.getItem(KEY) || ''; } catch {}
+
+function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3000); }
+async function api(path, body) {
+  const r = await fetch('/api/osoblje/' + path, { method: body ? 'POST' : 'GET', body: body ? JSON.stringify(body) : undefined,
+    headers: { 'Content-Type': 'application/json', 'X-Staff-Pin': pin } });
+  if (r.status === 401) { showLogin('Pogrešan PIN.'); throw new Error('auth'); }
+  if (r.status === 429) { showLogin('Previše pokušaja. Pričekajte 15 minuta.'); throw new Error('auth'); }
+  const j = await r.json().catch(() => ({ error: 'network' }));
+  if (j.error) throw new Error(j.error);
+  return j;
+}
+function showLogin(msg) {
+  $('app').hidden = true; $('login').hidden = false;
+  $('loginErr').hidden = !msg; $('loginErr').textContent = msg || ''; $('pin').focus();
+}
+$('login').onsubmit = async e => {
+  e.preventDefault(); pin = $('pin').value;
+  try { await refresh(); } catch { return; }
+  try { localStorage.setItem(KEY, pin); } catch {}
+  $('login').hidden = true; $('app').hidden = false;
+};
+
+// a short double beep for a new order (browsers allow sound only after a tap, hence the 🔔 button)
+function beep() {
+  if (!sound || !audio) return;
+  const t = audio.currentTime;
+  for (const [at, f] of [[0, 880], [0.22, 1175]]) {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = f; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(0.0001, t + at); g.gain.exponentialRampToValueAtTime(0.4, t + at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.18);
+    o.start(t + at); o.stop(t + at + 0.2);
+  }
+}
+$('soundBtn').onclick = () => {
+  sound = !sound;
+  if (sound) { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); beep(); }
+  $('soundBtn').textContent = sound ? '🔔 Zvuk uključen' : '🔕 Zvuk';
+};
+
+const NEXT = { nova: ['priprema', 'Počni', 'go'], priprema: ['spremno', 'Spremno', 'ready'], spremno: ['preuzeto', 'Preuzeto i plaćeno', 'go'] };
+const mins = o => Math.floor((Date.now() + skew - o.created) / 60000);
+function card(o) {
+  const n = NEXT[o.status], m = mins(o);
+  return `<div class="o" data-id="${o.id}">
+    <div class="top"><span class="n">#${o.num}</span><span class="who">${esc(o.name)}</span>
+      <span class="t${m >= 15 && o.status !== 'spremno' ? ' late' : ''}">${m < 1 ? 'sad' : m + ' min'}</span></div>
+    <ul>${o.items.map(i => `<li><b>${i.qty}×</b> ${esc(i.name)}</li>`).join('')}</ul>
+    ${o.note ? `<div class="notes">${esc(o.note)}</div>` : ''}
+    <div class="meta"><span class="tag">${o.pay === 'kartica' ? 'Kartica' : 'Gotovina'}</span><span>${eur(o.total)}</span>
+      ${o.alcohol ? '<span class="tag age">18+ provjeri osobnu</span>' : ''}</div>
+    <div class="acts"><button class="btn ${n[2]}" data-to="${n[0]}">${n[1]}</button>
+      <button class="btn x" data-to="${o.status === 'nova' ? 'otkazano' : o.status === 'priprema' ? 'nova' : 'priprema'}"
+        title="${o.status === 'nova' ? 'Otkaži' : 'Vrati korak'}">${o.status === 'nova' ? '✕' : '↶'}</button></div>
+  </div>`;
+}
+function render() {
+  $('openPill').textContent = data.open ? 'Primamo narudžbe' : 'Narudžbe zatvorene';
+  $('openPill').className = 'pill ' + (data.open ? 'on' : 'offp');
+  $('toggleOpen').textContent = data.open ? 'Zatvori' : 'Otvori';
+  $('toggleOpen').className = 'btn ' + (data.open ? 'off' : 'go');
+  for (const st of ['nova', 'priprema', 'spremno']) {
+    const list = data.orders.filter(o => o.status === st);
+    $('l-' + st).innerHTML = list.map(card).join('') || '<div class="empty">Nema.</div>';
+    $('cnt-' + st).textContent = list.length || '';
+  }
+  const done = data.orders.filter(o => o.status === 'preuzeto' || o.status === 'otkazano').sort((a, b) => b.updated - a.updated);
+  $('doneSum').textContent = `Završene, zadnja 2 sata (${done.length})`;
+  $('doneList').innerHTML = done.map(o => `<tr><td><b>#${o.num}</b></td><td>${esc(o.items.map(i => i.qty + '× ' + i.name).join(', '))}</td>
+    <td>${eur(o.total)}</td><td>${o.status === 'otkazano' ? 'otkazano' : 'preuzeto'}</td>
+    <td><button class="btn x" data-id="${o.id}" data-to="spremno" title="Vrati u Spremno">↶</button></td></tr>`).join('');
+  const soldOut = data.menu.filter(m => !m.available).length;
+  $('stockBtn').textContent = soldOut ? `Rasprodano (${soldOut})` : 'Rasprodano?';
+  $('stockList').innerHTML = data.menu.map(m => `<div class="si"><span>${esc(m.name)}</span>
+    <button class="btn ${m.available ? '' : 'go'}" data-item="${esc(m.id)}" data-av="${m.available ? 0 : 1}">${m.available ? 'Ima' : 'Rasprodano'}</button></div>`).join('');
+}
+async function refresh() {
+  const d = await api('narudzbe');
+  skew = d.now - Date.now();
+  const ids = new Set(d.orders.filter(o => o.status === 'nova').map(o => o.id));
+  if (known && [...ids].some(id => !known.has(id))) { beep(); try { navigator.vibrate && navigator.vibrate(200); } catch {} }
+  known = ids; data = d; render();
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-to]');
+  if (b) {
+    const id = b.dataset.id || b.closest('.o').dataset.id;
+    if (b.dataset.to === 'otkazano' && !confirm('Otkazati narudžbu?')) return;
+    b.disabled = true;
+    try { data = await api('narudzbe/' + id, { status: b.dataset.to }); render(); } catch (err) { if (err.message !== 'auth') toast('Nije spremljeno. Provjerite internet.'); b.disabled = false; }
+    return;
+  }
+  const s = e.target.closest('button[data-item]');
+  if (s) { try { data = await api('meni/' + s.dataset.item, { available: s.dataset.av === '1' }); render(); } catch (err) { if (err.message !== 'auth') toast('Nije spremljeno.'); } }
+});
+$('toggleOpen').onclick = async () => {
+  if (data.open && !confirm('Zatvoriti narudžbe mobitelom? Gosti će vidjeti da naručuju na šanku.')) return;
+  try { data = await api('otvoreno', { open: !data.open }); render(); } catch {}
+};
+$('stockBtn').onclick = () => $('stock').hidden = false;
+$('stockClose').onclick = () => $('stock').hidden = true;
+$('stock').onclick = e => { if (e.target.id === 'stock') $('stock').hidden = true; };
+
+setInterval(() => { if (pin && !$('app').hidden) refresh().catch(() => {}); }, 4000);
+(async () => {
+  if (!pin) return showLogin();
+  try { await refresh(); $('app').hidden = false; } catch (e) { if (e.message !== 'auth') showLogin('Nema veze s poslužiteljem.'); }
+})();
+</script>
+</body>
+</html>

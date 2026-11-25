@@ -1,49 +1,49 @@
-﻿Datum,Dan,Blok,Vrijeme,Sati,Mjesta,Tip dana,Naziv termina (za alat)
-10.12.2026.,čet,A,09:00–16:00,7,2,Koncert,čet 10.12. – blok A (09:00–16:00)
-10.12.2026.,čet,B,16:00–00:00,8,3,Koncert,čet 10.12. – blok B (16:00–00:00)
-11.12.2026.,pet,A,09:00–16:00,7,1,Običan,pet 11.12. – blok A (09:00–16:00)
-11.12.2026.,pet,B,16:00–00:00,8,2,Običan,pet 11.12. – blok B (16:00–00:00)
-12.12.2026.,sub,A,09:00–16:00,7,2,Koncert,sub 12.12. – blok A (09:00–16:00)
-12.12.2026.,sub,B,16:00–00:00,8,3,Koncert,sub 12.12. – blok B (16:00–00:00)
-13.12.2026.,ned,A,09:00–16:00,7,1,Običan,ned 13.12. – blok A (09:00–16:00)
-13.12.2026.,ned,B,16:00–00:00,8,2,Običan,ned 13.12. – blok B (16:00–00:00)
-14.12.2026.,pon,A,09:00–16:00,7,1,Običan,pon 14.12. – blok A (09:00–16:00)
-14.12.2026.,pon,B,16:00–00:00,8,2,Običan,pon 14.12. – blok B (16:00–00:00)
-15.12.2026.,uto,A,09:00–16:00,7,1,Običan,uto 15.12. – blok A (09:00–16:00)
-15.12.2026.,uto,B,16:00–00:00,8,2,Običan,uto 15.12. – blok B (16:00–00:00)
-16.12.2026.,sri,A,09:00–16:00,7,1,Običan,sri 16.12. – blok A (09:00–16:00)
-16.12.2026.,sri,B,16:00–00:00,8,2,Običan,sri 16.12. – blok B (16:00–00:00)
-17.12.2026.,čet,A,09:00–16:00,7,1,Običan,čet 17.12. – blok A (09:00–16:00)
-17.12.2026.,čet,B,16:00–00:00,8,2,Običan,čet 17.12. – blok B (16:00–00:00)
-18.12.2026.,pet,A,09:00–16:00,7,1,Običan,pet 18.12. – blok A (09:00–16:00)
-18.12.2026.,pet,B,16:00–00:00,8,2,Običan,pet 18.12. – blok B (16:00–00:00)
-19.12.2026.,sub,A,09:00–16:00,7,1,Običan,sub 19.12. – blok A (09:00–16:00)
-19.12.2026.,sub,B,16:00–00:00,8,2,Običan,sub 19.12. – blok B (16:00–00:00)
-20.12.2026.,ned,A,09:00–16:00,7,1,Običan,ned 20.12. – blok A (09:00–16:00)
-20.12.2026.,ned,B,16:00–00:00,8,2,Običan,ned 20.12. – blok B (16:00–00:00)
-21.12.2026.,pon,A,09:00–16:00,7,1,Običan,pon 21.12. – blok A (09:00–16:00)
-21.12.2026.,pon,B,16:00–00:00,8,2,Običan,pon 21.12. – blok B (16:00–00:00)
-22.12.2026.,uto,A,09:00–16:00,7,1,Običan,uto 22.12. – blok A (09:00–16:00)
-22.12.2026.,uto,B,16:00–00:00,8,2,Običan,uto 22.12. – blok B (16:00–00:00)
-23.12.2026.,sri,A,09:00–16:00,7,1,Običan,sri 23.12. – blok A (09:00–16:00)
-23.12.2026.,sri,B,16:00–00:00,8,2,Običan,sri 23.12. – blok B (16:00–00:00)
-24.12.2026.,čet,A,09:00–16:00,7,1,Običan,čet 24.12. – blok A (09:00–16:00)
-24.12.2026.,čet,B,16:00–03:00,11,2,Običan,čet 24.12. – blok B (16:00–03:00)
-25.12.2026.,pet,A,09:00–16:00,7,1,Običan,pet 25.12. – blok A (09:00–16:00)
-25.12.2026.,pet,B,16:00–00:00,8,2,Običan,pet 25.12. – blok B (16:00–00:00)
-26.12.2026.,sub,A,09:00–16:00,7,2,Koncert,sub 26.12. – blok A (09:00–16:00)
-26.12.2026.,sub,B,16:00–00:00,8,3,Koncert,sub 26.12. – blok B (16:00–00:00)
-27.12.2026.,ned,A,09:00–16:00,7,2,Koncert,ned 27.12. – blok A (09:00–16:00)
-27.12.2026.,ned,B,16:00–03:00,11,3,Koncert,ned 27.12. – blok B (16:00–03:00)
-28.12.2026.,pon,A,09:00–16:00,7,1,Običan,pon 28.12. – blok A (09:00–16:00)
-28.12.2026.,pon,B,16:00–00:00,8,2,Običan,pon 28.12. – blok B (16:00–00:00)
-29.12.2026.,uto,A,09:00–16:00,7,2,Koncert,uto 29.12. – blok A (09:00–16:00)
-29.12.2026.,uto,B,16:00–00:00,8,3,Koncert,uto 29.12. – blok B (16:00–00:00)
-30.12.2026.,sri,A,09:00–16:00,7,2,Koncert,sri 30.12. – blok A (09:00–16:00)
-30.12.2026.,sri,B,16:00–00:00,8,3,Koncert,sri 30.12. – blok B (16:00–00:00)
-31.12.2026.,čet,A,09:00–16:00,7,2,Koncert,čet 31.12. – blok A (09:00–16:00)
-31.12.2026.,čet,B,16:00–03:00,11,3,Koncert,čet 31.12. – blok B (16:00–03:00)
-01.01.2027.,pet,A,09:00–16:00,7,1,Običan,pet 1.1. – blok A (09:00–16:00)
-01.01.2027.,pet,B,16:00–00:00,8,2,Običan,pet 1.1. – blok B (16:00–00:00)
-02.01.2027.,sub,A,09:00–16:00,7,1,Običan,sub 2.1. – blok A (09:00–16:00)
-02.01.2027.,sub,B,16:00–00:00,8,2,Običan,sub 2.1. – blok B (16:00–00:00)
+﻿Datum,Dan,Blok,Vrijeme,Sati,Mjesta,Tip dana,Naziv termina (za alat),Događaj
+10.12.2026.,čet,A,09:00–16:00,7,2,Koncert,čet 10.12. – blok A (09:00–16:00),"Otvaranje Adventa — koncert Ciplići, 21:00 (šator)"
+10.12.2026.,čet,B,16:00–00:00,8,3,Koncert,čet 10.12. – blok B (16:00–00:00),"Otvaranje Adventa — koncert Ciplići, 21:00 (šator)"
+11.12.2026.,pet,A,09:00–16:00,7,1,Običan,pet 11.12. – blok A (09:00–16:00),Program Društva Naša Djeca 17:00; izložba Fiat lux 19:00
+11.12.2026.,pet,B,16:00–00:00,8,2,Običan,pet 11.12. – blok B (16:00–00:00),Program Društva Naša Djeca 17:00; izložba Fiat lux 19:00
+12.12.2026.,sub,A,09:00–16:00,7,2,Koncert,sub 12.12. – blok A (09:00–16:00),"Sarmijada 11:00, Grinchmas 11:00, vaganje ulova 17:30, koncert Mišomanija 21:00"
+12.12.2026.,sub,B,16:00–00:00,8,3,Koncert,sub 12.12. – blok B (16:00–00:00),"Sarmijada 11:00, Grinchmas 11:00, vaganje ulova 17:30, koncert Mišomanija 21:00"
+13.12.2026.,ned,A,09:00–16:00,7,1,Običan,ned 13.12. – blok A (09:00–16:00),
+13.12.2026.,ned,B,16:00–00:00,8,2,Običan,ned 13.12. – blok B (16:00–00:00),
+14.12.2026.,pon,A,09:00–16:00,7,1,Običan,pon 14.12. – blok A (09:00–16:00),Prigodni program Naša Djeca 18:00
+14.12.2026.,pon,B,16:00–00:00,8,2,Običan,pon 14.12. – blok B (16:00–00:00),Prigodni program Naša Djeca 18:00
+15.12.2026.,uto,A,09:00–16:00,7,1,Običan,uto 15.12. – blok A (09:00–16:00),Prigodni program Naša Djeca 18:00
+15.12.2026.,uto,B,16:00–00:00,8,2,Običan,uto 15.12. – blok B (16:00–00:00),Prigodni program Naša Djeca 18:00
+16.12.2026.,sri,A,09:00–16:00,7,1,Običan,sri 16.12. – blok A (09:00–16:00),Prigodni program Naša Djeca 18:00
+16.12.2026.,sri,B,16:00–00:00,8,2,Običan,sri 16.12. – blok B (16:00–00:00),Prigodni program Naša Djeca 18:00
+17.12.2026.,čet,A,09:00–16:00,7,1,Običan,čet 17.12. – blok A (09:00–16:00),Prigodni program Naša Djeca 18:00
+17.12.2026.,čet,B,16:00–00:00,8,2,Običan,čet 17.12. – blok B (16:00–00:00),Prigodni program Naša Djeca 18:00
+18.12.2026.,pet,A,09:00–16:00,7,1,Običan,pet 18.12. – blok A (09:00–16:00),Prigodni program Naša Djeca 18:00
+18.12.2026.,pet,B,16:00–00:00,8,2,Običan,pet 18.12. – blok B (16:00–00:00),Prigodni program Naša Djeca 18:00
+19.12.2026.,sub,A,09:00–16:00,7,1,Običan,sub 19.12. – blok A (09:00–16:00),"Veliki dan: gulaš 08:30, Božićni trk 11:00, aukcija 19:30, humanitarni koncert Face 22:00"
+19.12.2026.,sub,B,16:00–00:00,8,2,Običan,sub 19.12. – blok B (16:00–00:00),"Veliki dan: gulaš 08:30, Božićni trk 11:00, aukcija 19:30, humanitarni koncert Face 22:00"
+20.12.2026.,ned,A,09:00–16:00,7,1,Običan,ned 20.12. – blok A (09:00–16:00),Advent u Nerezinama (ne na Trgu RH)
+20.12.2026.,ned,B,16:00–00:00,8,2,Običan,ned 20.12. – blok B (16:00–00:00),Advent u Nerezinama (ne na Trgu RH)
+21.12.2026.,pon,A,09:00–16:00,7,1,Običan,pon 21.12. – blok A (09:00–16:00),Prigodni program Naša Djeca 18:00
+21.12.2026.,pon,B,16:00–00:00,8,2,Običan,pon 21.12. – blok B (16:00–00:00),Prigodni program Naša Djeca 18:00
+22.12.2026.,uto,A,09:00–16:00,7,1,Običan,uto 22.12. – blok A (09:00–16:00),Humanitarna aukcija Naša Djeca 18:00
+22.12.2026.,uto,B,16:00–00:00,8,2,Običan,uto 22.12. – blok B (16:00–00:00),Humanitarna aukcija Naša Djeca 18:00
+23.12.2026.,sri,A,09:00–16:00,7,1,Običan,sri 23.12. – blok A (09:00–16:00),Humanitarni stand up (kino V. Nazor) 20:00
+23.12.2026.,sri,B,16:00–00:00,8,2,Običan,sri 23.12. – blok B (16:00–00:00),Humanitarni stand up (kino V. Nazor) 20:00
+24.12.2026.,čet,A,09:00–16:00,7,1,Običan,čet 24.12. – blok A (09:00–16:00),Badnje jutro 11:00; polnoćka
+24.12.2026.,čet,B,16:00–03:00,11,2,Običan,čet 24.12. – blok B (16:00–03:00),Badnje jutro 11:00; polnoćka
+25.12.2026.,pet,A,09:00–16:00,7,1,Običan,pet 25.12. – blok A (09:00–16:00),Božić — mise
+25.12.2026.,pet,B,16:00–00:00,8,2,Običan,pet 25.12. – blok B (16:00–00:00),Božić — mise
+26.12.2026.,sub,A,09:00–16:00,7,2,Koncert,sub 26.12. – blok A (09:00–16:00),Koncert grupe Dellboys 21:00
+26.12.2026.,sub,B,16:00–00:00,8,3,Koncert,sub 26.12. – blok B (16:00–00:00),Koncert grupe Dellboys 21:00
+27.12.2026.,ned,A,09:00–16:00,7,2,Koncert,ned 27.12. – blok A (09:00–16:00),Studentska večer — Silente & DJ Charly 21:00
+27.12.2026.,ned,B,16:00–03:00,11,3,Koncert,ned 27.12. – blok B (16:00–03:00),Studentska večer — Silente & DJ Charly 21:00
+28.12.2026.,pon,A,09:00–16:00,7,1,Običan,pon 28.12. – blok A (09:00–16:00),
+28.12.2026.,pon,B,16:00–00:00,8,2,Običan,pon 28.12. – blok B (16:00–00:00),
+29.12.2026.,uto,A,09:00–16:00,7,2,Koncert,uto 29.12. – blok A (09:00–16:00),Christmas Disco Fever & DJ-evi 20:00
+29.12.2026.,uto,B,16:00–00:00,8,3,Koncert,uto 29.12. – blok B (16:00–00:00),Christmas Disco Fever & DJ-evi 20:00
+30.12.2026.,sri,A,09:00–16:00,7,2,Koncert,sri 30.12. – blok A (09:00–16:00),Koncert Macaklini bend 21:00
+30.12.2026.,sri,B,16:00–00:00,8,3,Koncert,sri 30.12. – blok B (16:00–00:00),Koncert Macaklini bend 21:00
+31.12.2026.,čet,A,09:00–16:00,7,2,Koncert,čet 31.12. – blok A (09:00–16:00),Jutarnji dir 10:00; Insula; doček SuperCover Band 22:00
+31.12.2026.,čet,B,16:00–03:00,11,3,Koncert,čet 31.12. – blok B (16:00–03:00),Jutarnji dir 10:00; Insula; doček SuperCover Band 22:00
+01.01.2027.,pet,A,09:00–16:00,7,1,Običan,pet 1.1. – blok A (09:00–16:00),
+01.01.2027.,pet,B,16:00–00:00,8,2,Običan,pet 1.1. – blok B (16:00–00:00),
+02.01.2027.,sub,A,09:00–16:00,7,1,Običan,sub 2.1. – blok A (09:00–16:00),After New Year program
+02.01.2027.,sub,B,16:00–00:00,8,2,Običan,sub 2.1. – blok B (16:00–00:00),After New Year program

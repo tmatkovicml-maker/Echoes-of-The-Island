@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "test": "node --test test/rules.test.js",
+    "test": "node --test test/rules.test.js test/orders.test.js",
     "test:server": "node test/server.test.js",
     "qr": "node scripts/qr.js"
   },

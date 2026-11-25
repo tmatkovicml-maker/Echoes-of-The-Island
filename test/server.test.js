@@ -44,6 +44,7 @@ test('public state: 48 shifts, nothing personal', async () => {
   assert.equal(data.slots.length, 48);
   const first = data.slots.find(s => s.id === '2026-12-10-B');                 // from Termini_prijave.csv
   assert.deepEqual([first.capacity, first.free, first.note], [3, 3, 'Koncert']);
+  assert.match(first.event, /Ciplići/);
   assert.equal(data.open, true);
   assert.ok(data.slots.every(s => !('taken' in s) || s.taken === undefined));
 });
@@ -156,6 +157,74 @@ test('QR code: PNG and SVG of the public page', async () => {
   assert.deepEqual([...png.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   const svg = await fetch(BASE + '/qr.svg').then(r => r.text());
   assert.ok(svg.includes('<svg') && svg.includes('<path'));
+});
+
+test('export for the workbook: name, ISO date, block', async () => {
+  await signUp(['2026-12-12-A'], phone(3000), 'Tina Tinić');
+  const text = new TextDecoder().decode(await fetch(BASE + '/api/admin/export-tablica.csv', { headers: { 'X-Admin-Password': PW } }).then(r => r.arrayBuffer()));
+  const lines = text.trim().split('\r\n');
+  assert.equal(lines[0], 'Ime i prezime;Datum;Blok');
+  assert.ok(lines.includes('Tina Tinić;2026-12-12;A'));
+});
+
+// ---- QR orders ----
+const order = (items, extra = {}) => call('/api/narudzba', { body: { items, pay: 'kartica', name: 'Mia', note: '', ...extra } });
+const staff = (path, body, pin = PW) => fetch(BASE + '/api/osoblje/' + path, { method: body ? 'POST' : 'GET',
+  headers: { 'Content-Type': 'application/json', 'X-Staff-Pin': pin, 'CF-Connecting-IP': '10.77.0.1' }, body: body ? JSON.stringify(body) : undefined })
+  .then(async r => ({ status: r.status, data: await r.json() }));
+
+test('QR orders: closed until opened, then priced by the server and numbered per day', async () => {
+  assert.equal((await order([{ id: 'H01', qty: 1 }])).data.error, 'closed');
+  await call('/api/admin/settings', { body: { orders_open: true }, admin: true });
+  const menu = (await call('/api/meni')).data;
+  assert.equal(menu.open, true);
+  assert.equal(menu.items.length, 12);                                    // the two undecided items are hidden
+  const a = await order([{ id: 'H01', qty: 2, price: 0 }, { id: 'P05', qty: 1 }]);
+  assert.equal(a.status, 200);
+  assert.deepEqual([a.data.total, a.data.status, a.data.pay], [24.5, 'nova', 'kartica']);
+  const b = await order([{ id: 'P04', qty: 1 }], { pay: 'gotovina' });
+  assert.equal(b.data.num, a.data.num + 1);
+  assert.equal(b.data.ahead, 1);
+  assert.equal((await order([{ id: 'P08', qty: 1 }])).data.error, 'adult');
+  assert.equal((await order([{ id: 'P08', qty: 1 }], { adult: true })).data.alcohol, true);
+  assert.equal((await order([{ id: 'S01', qty: 1 }])).data.error, 'unavailable');
+  assert.equal((await order([{ id: 'H01', qty: 1 }], { pay: 'bitcoin' })).data.error, 'pay');
+
+  // the hut's screen
+  assert.equal((await staff('narudzbe', null, 'krivo')).status, 401);
+  const list = (await staff('narudzbe')).data;
+  const mine = list.orders.find(o => o.num === a.data.num);
+  assert.equal(mine.name, 'Mia');
+  await staff('narudzbe/' + mine.id, { status: 'priprema' });
+  assert.equal((await call(`/api/narudzba/${a.data.token}`)).data.status, 'priprema');
+  assert.equal((await call(`/api/narudzba/${a.data.token}/otkazi`, { body: {} })).data.error, 'started');
+  assert.equal((await call(`/api/narudzba/${b.data.token}/otkazi`, { body: {} })).data.status, 'otkazano');
+  await staff('narudzbe/' + mine.id, { status: 'spremno' });
+  await staff('narudzbe/' + mine.id, { status: 'preuzeto' });
+
+  // sold out on the screen → gone from the guests' menu
+  await staff('meni/H02', { available: false });
+  assert.ok(!(await call('/api/meni')).data.items.some(i => i.id === 'H02'));
+  assert.equal((await order([{ id: 'H02', qty: 1 }])).data.error, 'unavailable');
+
+  // organizer: per-day total counts picked-up orders only; export
+  const sum = (await call('/api/admin/meni', { admin: true })).data;
+  assert.equal(sum.days[0].total, 24.5);
+  assert.equal(sum.days[0].cancelled, 1);
+  const csv = await fetch(BASE + '/api/admin/narudzbe.csv', { headers: { 'X-Admin-Password': PW } }).then(r => r.text());
+  assert.ok(csv.includes('2× Kozice u češnjaku, 1× Čaj') && csv.includes('24,50'));
+  // the organizer edits the menu
+  const items = sum.menu.map(m => m.id === 'S01' ? { ...m, name: 'Fritule', available: true } : m);
+  const saved = (await call('/api/admin/meni', { body: { items }, admin: true })).data;
+  assert.equal(saved.menu.find(m => m.id === 'S01').name, 'Fritule');
+  assert.ok((await call('/api/meni')).data.items.some(i => i.name === 'Fritule'));
+});
+
+test('QR code of the menu', async () => {
+  const svg = await fetch(BASE + '/qr-meni.svg').then(r => r.text());
+  assert.ok(svg.includes('<path'));
+  const png = new Uint8Array(await fetch(BASE + '/qr-meni.png').then(r => r.arrayBuffer()));
+  assert.deepEqual([...png.slice(0, 4)], [137, 80, 78, 71]);
 });
 
 test('per-IP limit on sign-ups', async () => {

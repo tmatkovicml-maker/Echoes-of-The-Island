@@ -1,5 +1,7 @@
-// Shift sign-up for the Advent hut in Mali Lošinj (10.12.2026–02.01.2027).
-// Adult students pick their shifts without an account; a shift closes as soon as it is full.
+// Echoes of the Island, the Advent hut in Mali Lošinj (10.12.2026–02.01.2027):
+// 1. shift sign-up: adult students pick their shifts without an account; a shift closes as soon as it is full;
+// 2. QR orders: guests order from the menu on their phone, the hut's screen shows the orders, the guest pays at
+//    the counter (cash or card) on the hut's own till. Orders are not receipts.
 //
 // Public (no account):
 //   GET  /api/stanje                     shifts with free places, whether sign-up is open, terms (no names, no phones)
@@ -17,7 +19,15 @@
 //   POST /api/admin/regs/:id/confirm     confirm a sign-up (when sign-ups are confirmed by hand)
 //   DELETE /api/admin/regs/:id           remove a sign-up
 //   POST /api/admin/wipe                 {confirm: "OBRIŠI"}  delete all names and phones now
-// Pages: /  sign-up · /moji/:token  my shifts · /admin  organizer
+//   GET  /api/admin/export-tablica.csv  Ime i prezime;Datum;Blok for pasting into the "Prijave" sheet of the planning workbook
+//   GET  /api/admin/meni                 menu and orders per day · POST {items} save the menu · POST meni/import {csv}
+//   GET  /api/admin/narudzbe.csv         all orders for Excel
+// QR orders (guests): GET /api/meni · POST /api/narudzba {items: [{id, qty}], pay, name, note, website}
+//   GET /api/narudzba/:token (status) · POST /api/narudzba/:token/otkazi (only while not started)
+// Hut's screen (X-Staff-Pin = STAFF_PIN or ADMIN_PASSWORD): GET /api/osoblje/narudzbe · POST /api/osoblje/narudzbe/:id {status}
+//   POST /api/osoblje/otvoreno {open} · POST /api/osoblje/meni/:id {available}
+// Pages: /  sign-up · /moji/:token  my shifts · /admin  organizer · /meni  menu and ordering · /narudzba/:token  my order
+//   · /kuhinja  the hut's order screen · /qr-meni.svg|png  QR code of the menu
 //
 // Everything is in one Durable Object (SQLite). A Durable Object runs one request at a time and
 // signUp() does its checks and writes in one synchronous transaction, so two people can never
@@ -27,6 +37,10 @@ import PUBLIC_PAGE from './public.html';
 import ADMIN_PAGE from './admin.html';
 import { qrSvg, qrPng } from './qr.js';
 import TERMINI_CSV from '../Termini_prijave.csv';   // the organizer's 48 shifts, loaded into an empty database
+import JELOVNIK_CSV from '../Jelovnik.csv';          // the menu for QR orders, loaded into an empty database
+import MENU_PAGE from './menu.html';
+import KITCHEN_PAGE from './kitchen.html';
+import { STATUSES, PAY, businessDay, validItem, parseMenuCsv, priceOrder, ordersCsv } from './orders.js';
 import {
   MAX_WEEK_HOURS, normalizePhone, formatPhone, isoWeek, isDay, checkChoice, weekHours,
   parseSlotsCsv, slotStartMs,
@@ -40,8 +54,10 @@ const DEFAULTS = {
   terms: '',              // pay and conditions, shown on the page only when filled in
   organizer: '',          // who collects the data (privacy notice)
   wipe_on: '2027-01-31',  // names and phones are deleted automatically on this day
+  orders_open: false,     // QR orders are taken (switched on the hut's screen or in /admin)
 };
-const LIMITS = { signup: [15, 10 * MINUTE], cancel: [30, 10 * MINUTE], mine: [120, 10 * MINUTE], admin_fail: [10, 15 * MINUTE] };
+const LIMITS = { signup: [15, 10 * MINUTE], cancel: [30, 10 * MINUTE], mine: [120, 10 * MINUTE], admin_fail: [10, 15 * MINUTE],
+  order: [8, 10 * MINUTE], order_view: [400, 10 * MINUTE] };
 
 const str = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 const text = (v, max) => String(v ?? '').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').trim().slice(0, max);
@@ -59,14 +75,29 @@ export class Store extends DurableObject {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS limits (k TEXT NOT NULL, at INTEGER NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS slots (id TEXT PRIMARY KEY, day TEXT NOT NULL, block TEXT NOT NULL,
-      start TEXT NOT NULL, "end" TEXT NOT NULL, hours REAL NOT NULL, capacity INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '')`);
+      start TEXT NOT NULL, "end" TEXT NOT NULL, hours REAL NOT NULL, capacity INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '', event TEXT NOT NULL DEFAULT '')`);
     // one row per person per shift; token = the private link of the sign-up it was made with
     this.sql.exec(`CREATE TABLE IF NOT EXISTS regs (id INTEGER PRIMARY KEY AUTOINCREMENT, slot_id TEXT NOT NULL,
       phone TEXT NOT NULL, name TEXT NOT NULL, token TEXT NOT NULL, status TEXT NOT NULL, source TEXT NOT NULL, created INTEGER NOT NULL,
       UNIQUE (slot_id, phone))`);
     this.sql.exec('CREATE INDEX IF NOT EXISTS regs_phone ON regs (phone)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS regs_token ON regs (token)');
-    if (!this.sql.exec('PRAGMA table_info(slots)').toArray().some(c => c.name === 'note')) this.sql.exec(`ALTER TABLE slots ADD COLUMN note TEXT NOT NULL DEFAULT ''`);
+    const cols = this.sql.exec('PRAGMA table_info(slots)').toArray().map(c => c.name);
+    if (!cols.includes('note')) this.sql.exec(`ALTER TABLE slots ADD COLUMN note TEXT NOT NULL DEFAULT ''`);
+    if (cols.length && !cols.includes('event')) {
+      // a database from before events were shown: add the column and fill in each day's programme from the CSV
+      this.sql.exec(`ALTER TABLE slots ADD COLUMN event TEXT NOT NULL DEFAULT ''`);
+      for (const t of parseSlotsCsv(TERMINI_CSV)) this.sql.exec('UPDATE slots SET event = ? WHERE id = ?', t.event, t.id);
+    }
+    // QR orders: the menu, and the orders (name is only a first name to call out, optional)
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS menu (id TEXT PRIMARY KEY, sort INTEGER NOT NULL, cat TEXT NOT NULL, name TEXT NOT NULL,
+      descr TEXT NOT NULL, price REAL NOT NULL, allergens TEXT NOT NULL, available INTEGER NOT NULL, alcohol INTEGER NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, num INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE, items TEXT NOT NULL, total REAL NOT NULL, alcohol INTEGER NOT NULL, pay TEXT NOT NULL,
+      name TEXT NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL)`);
+    this.sql.exec('CREATE INDEX IF NOT EXISTS orders_day ON orders (day, num)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS orders_status ON orders (status)');
+    if (this.sql.exec('SELECT COUNT(*) AS n FROM menu').one().n === 0) this.writeMenu(parseMenuCsv(JELOVNIK_CSV));
     if (this.sql.exec('SELECT COUNT(*) AS n FROM slots').one().n === 0) this.insertSlots(parseSlotsCsv(TERMINI_CSV));
   }
 
@@ -93,7 +124,7 @@ export class Store extends DurableObject {
 
   // ---- shifts ----
   slots() {
-    return this.sql.exec(`SELECT s.id, s.day, s.block, s.start, s."end" AS "end", s.hours, s.capacity, s.note,
+    return this.sql.exec(`SELECT s.id, s.day, s.block, s.start, s."end" AS "end", s.hours, s.capacity, s.note, s.event,
       (SELECT COUNT(*) FROM regs r WHERE r.slot_id = s.id) AS taken FROM slots s ORDER BY s.day, s.block`).toArray();
   }
   slot(id) {
@@ -102,9 +133,10 @@ export class Store extends DurableObject {
   taken(id) { return this.sql.exec('SELECT COUNT(*) AS n FROM regs WHERE slot_id = ?', id).one().n; }
   insertSlots(list) {
     for (const s of list) {
-      this.sql.exec(`INSERT INTO slots (id, day, block, start, "end", hours, capacity, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      this.sql.exec(`INSERT INTO slots (id, day, block, start, "end", hours, capacity, note, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET day = excluded.day, block = excluded.block, start = excluded.start, "end" = excluded."end",
-        hours = excluded.hours, capacity = excluded.capacity, note = excluded.note`, s.id, s.day, s.block, s.start, s.end, s.hours, s.capacity, s.note || '');
+        hours = excluded.hours, capacity = excluded.capacity, note = excluded.note, event = excluded.event`,
+        s.id, s.day, s.block, s.start, s.end, s.hours, s.capacity, s.note || '', s.event || '');
     }
   }
   personShifts(phone) {
@@ -247,8 +279,92 @@ export class Store extends DurableObject {
       FROM regs r JOIN slots s ON s.id = r.slot_id ORDER BY s.day, s.block, r.name`).toArray();
   }
 
+  // ---- QR orders ----
+  menu() {
+    return this.sql.exec('SELECT id, cat, name, descr, price, allergens, available, alcohol FROM menu ORDER BY sort').toArray()
+      .map(m => ({ ...m, available: !!m.available, alcohol: !!m.alcohol }));
+  }
+  writeMenu(items) {
+    this.sql.exec('DELETE FROM menu');
+    items.forEach((m, i) => this.sql.exec(`INSERT INTO menu (id, sort, cat, name, descr, price, allergens, available, alcohol)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.id, i, m.cat, m.name, m.descr, m.price, m.allergens, m.available ? 1 : 0, m.alcohol ? 1 : 0));
+  }
+  saveMenu(items) { this.ctx.storage.transactionSync(() => this.writeMenu(items)); return this.menu(); }
+  setAvailable(id, on) { this.sql.exec('UPDATE menu SET available = ? WHERE id = ?', on ? 1 : 0, id); return this.staffData(); }
+
+  menuPublic() {
+    return { open: this.settings().orders_open, items: this.menu().filter(m => m.available) };
+  }
+
+  async placeOrder({ lines, pay, name, note, adult }, ip) {
+    if (this.limited('order', ip)) return { status: 429, error: 'too_many' };
+    this.hit('order', ip);
+    const res = this.ctx.storage.transactionSync(() => {
+      if (!this.settings().orders_open) return { status: 409, error: 'closed' };
+      const p = priceOrder(lines, this.menu());
+      if (p.error) return { status: 409, ...p, menu: this.menuPublic() };
+      if (p.alcohol && !adult) return { status: 400, error: 'adult' };   // the staff still checks ID at pick-up
+      const day = businessDay(), now = Date.now(), token = newToken();
+      const num = this.sql.exec('SELECT COALESCE(MAX(num), 0) + 1 AS n FROM orders WHERE day = ?', day).one().n;
+      this.sql.exec(`INSERT INTO orders (day, num, token, items, total, alcohol, pay, name, note, status, created, updated)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'nova', ?, ?)`, day, num, token, JSON.stringify(p.items), p.total, p.alcohol ? 1 : 0, pay, name, note, now, now);
+      return { token };
+    });
+    return res.error ? res : { ...this.orderView(res.token), token: res.token };
+  }
+
+  orderView(token) {
+    const o = this.sql.exec('SELECT * FROM orders WHERE token = ?', token).toArray()[0];
+    if (!o) return { status: 404, error: 'not_found' };
+    const ahead = o.status === 'nova' || o.status === 'priprema'
+      ? this.sql.exec(`SELECT COUNT(*) AS n FROM orders WHERE status IN ('nova', 'priprema') AND created < ?`, o.created).one().n : 0;
+    return { num: o.num, day: o.day, status: o.status, items: JSON.parse(o.items), total: o.total, pay: o.pay, name: o.name,
+      alcohol: !!o.alcohol, created: o.created, updated: o.updated, ahead };
+  }
+  orderViewChecked(token, ip) {
+    if (this.limited('order_view', ip)) return { status: 429, error: 'too_many' };
+    this.hit('order_view', ip);
+    return this.orderView(token);
+  }
+  // the guest can cancel while the order has not been started
+  cancelOrder(token) {
+    const o = this.sql.exec('SELECT id, status FROM orders WHERE token = ?', token).toArray()[0];
+    if (!o) return { status: 404, error: 'not_found' };
+    if (o.status !== 'nova') return { status: 409, error: 'started' };
+    this.sql.exec(`UPDATE orders SET status = 'otkazano', updated = ? WHERE id = ?`, Date.now(), o.id);
+    return this.orderView(token);
+  }
+
+  // the hut's screen: everything still open, and what was finished in the last 2 hours
+  staffData() {
+    const rows = this.sql.exec(`SELECT id, day, num, items, total, alcohol, pay, name, note, status, created, updated FROM orders
+      WHERE status IN ('nova', 'priprema', 'spremno') OR updated > ? ORDER BY created`, Date.now() - 2 * HOUR).toArray();
+    return { open: this.settings().orders_open, now: Date.now(), menu: this.menu(),
+      orders: rows.map(o => ({ ...o, items: JSON.parse(o.items), alcohol: !!o.alcohol })) };
+  }
+  setOrderStatus(id, status) {
+    this.sql.exec('UPDATE orders SET status = ?, updated = ? WHERE id = ?', status, Date.now(), id);
+    return this.staffData();
+  }
+  setOrdersOpen(open) { this.put('orders_open', !!open); return this.staffData(); }
+
+  // per day: orders, collected total (picked up), and how many of each item
+  ordersSummary() {
+    const days = {};
+    for (const o of this.sql.exec('SELECT day, items, total, status FROM orders ORDER BY day DESC').toArray()) {
+      const d = days[o.day] ||= { day: o.day, orders: 0, cancelled: 0, total: 0, items: {} };
+      if (o.status === 'otkazano') { d.cancelled++; continue; }
+      d.orders++;
+      if (o.status === 'preuzeto') d.total = Math.round((d.total + o.total) * 100) / 100;
+      for (const i of JSON.parse(o.items)) d.items[i.name] = (d.items[i.name] || 0) + i.qty;
+    }
+    return { days: Object.values(days), menu: this.menu(), open: this.settings().orders_open };
+  }
+  exportOrders() { return this.sql.exec('SELECT day, num, items, total, pay, status, created FROM orders ORDER BY created').toArray(); }
+
   // ---- privacy: names and phones are deleted on wipe_on (or now, from /admin) ----
   wipe() {
+    this.sql.exec(`UPDATE orders SET name = '', note = ''`);
     this.sql.exec('DELETE FROM regs');
     this.sql.exec('DELETE FROM limits');
     return this.adminData();
@@ -278,6 +394,8 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
 const page = (html, robots) => new Response(html, {
   headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEC, ...(robots ? { 'X-Robots-Tag': robots } : {}) },
 });
+// HTTP status of a Store result: errors carry a number; an order's own "status" is a word (nova, priprema…)
+const code = r => (typeof r.status === 'number' ? r.status : 200);
 async function body(req) { try { return await req.json(); } catch { return null; } }
 
 function sameString(a, b) {
@@ -291,6 +409,7 @@ function validSettings(b) {
   if (!b || typeof b !== 'object') return null;
   const out = {};
   if ('open' in b) out.open = !!b.open;
+  if ('orders_open' in b) out.orders_open = !!b.orders_open;
   if ('manual' in b) out.manual = !!b.manual;
   if ('cancel_hours' in b) { const n = Number(b.cancel_hours); if (!Number.isInteger(n) || n < 0 || n > 24 * 30) return null; out.cancel_hours = n; }
   if ('terms' in b) out.terms = text(b.terms, 2000);
@@ -314,6 +433,14 @@ function exportCsv(rows) {
   return '﻿' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';
 }
 
+// For the organizer's workbook (sheet "Prijave", columns A–C from row 5): name, date as 2026-12-10
+// (Excel reads that as a date in every language, so the sheet's formulas match it) and block.
+function sheetCsv(rows) {
+  const q = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const out = [['Ime i prezime', 'Datum', 'Blok'], ...rows.map(r => [r.name, r.day, r.block])];
+  return '\uFEFF' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
@@ -323,13 +450,57 @@ export default {
     if (method === 'GET' && (path === '/' || path === '/index.html')) return page(PUBLIC_PAGE);
     if (method === 'GET' && /^\/moji\/[\w-]{16,40}$/.test(path)) return page(PUBLIC_PAGE, 'noindex');
     if (method === 'GET' && path === '/admin') return page(ADMIN_PAGE, 'noindex');
-    if (method === 'GET' && path === '/robots.txt') return new Response('User-agent: *\nDisallow: /moji/\nDisallow: /admin\nDisallow: /api/\n');
+    if (method === 'GET' && path === '/meni') return page(MENU_PAGE);
+    if (method === 'GET' && /^\/narudzba\/[\w-]{16,40}$/.test(path)) return page(MENU_PAGE, 'noindex');
+    if (method === 'GET' && path === '/kuhinja') return page(KITCHEN_PAGE, 'noindex');
+    if (method === 'GET' && path === '/robots.txt') return new Response('User-agent: *\nDisallow: /moji/\nDisallow: /narudzba/\nDisallow: /kuhinja\nDisallow: /admin\nDisallow: /api/\n');
 
-    if (method === 'GET' && (path === '/qr.svg' || path === '/qr.png')) {
-      const target = env.PUBLIC_URL || `${url.origin}/`;
-      if (path === '/qr.svg') return new Response(qrSvg(target), { headers: { 'Content-Type': 'image/svg+xml', 'Content-Disposition': 'inline; filename="qr-prijave.svg"' } });
+    // QR codes: /qr.svg|png → the sign-up page, /qr-meni.svg|png → the menu for orders
+    let m = path.match(/^\/qr(-meni)?\.(svg|png)$/);
+    if (m && method === 'GET') {
+      const base = env.PUBLIC_URL || `${url.origin}/`;
+      const target = m[1] ? new URL('meni', base).href : base;
+      const file = `qr-${m[1] ? 'meni' : 'prijave'}.${m[2]}`;
+      if (m[2] === 'svg') return new Response(qrSvg(target), { headers: { 'Content-Type': 'image/svg+xml', 'Content-Disposition': `inline; filename="${file}"` } });
       const scale = Math.min(80, Math.max(10, parseInt(url.searchParams.get('scale')) || 40));
-      return new Response(await qrPng(target, scale), { headers: { 'Content-Type': 'image/png', 'Content-Disposition': 'inline; filename="qr-prijave.png"' } });
+      return new Response(await qrPng(target, scale), { headers: { 'Content-Type': 'image/png', 'Content-Disposition': `inline; filename="${file}"` } });
+    }
+
+    // ---- QR orders (guests) ----
+    if (path === '/api/meni' && method === 'GET') return json(await store.menuPublic());
+    if (path === '/api/narudzba' && method === 'POST') {
+      const b = await body(request);
+      if (!b || typeof b !== 'object' || b.website) return json({ error: 'invalid' }, 400);
+      if (!PAY.includes(b.pay)) return json({ error: 'pay' }, 400);
+      const name = str(b.name, 30), note = str(b.note, 140);
+      const res = await store.placeOrder({ lines: b.items, pay: b.pay, name, note, adult: b.adult === true }, ip);
+      return json(res, code(res));
+    }
+    m = path.match(/^\/api\/narudzba\/([\w-]{16,40})(\/otkazi)?$/);
+    if (m && !m[2] && method === 'GET') { const res = await store.orderViewChecked(m[1], ip); return json(res, code(res)); }
+    if (m && m[2] && method === 'POST') { const res = await store.cancelOrder(m[1]); return json(res, code(res)); }
+
+    // ---- the hut's order screen (X-Staff-Pin = STAFF_PIN, or the organizer's password) ----
+    if (path.startsWith('/api/osoblje/')) {
+      if (!env.STAFF_PIN && !env.ADMIN_PASSWORD) return json({ error: 'no_password' }, 503);
+      if (await store.adminBlocked(ip)) return json({ error: 'too_many' }, 429);
+      const pin = request.headers.get('X-Staff-Pin') || '';
+      if (!((env.STAFF_PIN && sameString(pin, env.STAFF_PIN)) || (env.ADMIN_PASSWORD && sameString(pin, env.ADMIN_PASSWORD)))) {
+        await store.adminFailed(ip);
+        return json({ error: 'password' }, 401);
+      }
+      const route = path.slice('/api/osoblje/'.length);
+      if (route === 'narudzbe' && method === 'GET') return json(await store.staffData());
+      if (route === 'otvoreno' && method === 'POST') return json(await store.setOrdersOpen(!!(await body(request))?.open));
+      let r = route.match(/^narudzbe\/(\d+)$/);
+      if (r && method === 'POST') {
+        const st = (await body(request))?.status;
+        if (!STATUSES.includes(st)) return json({ error: 'invalid' }, 400);
+        return json(await store.setOrderStatus(+r[1], st));
+      }
+      r = route.match(/^meni\/([A-Za-z0-9]{1,12})$/);
+      if (r && method === 'POST') return json(await store.setAvailable(r[1].toUpperCase(), !!(await body(request))?.available));
+      return json({ error: 'not_found' }, 404);
     }
 
     if (path === '/api/stanje' && method === 'GET') return json(await store.publicState());
@@ -350,7 +521,7 @@ export default {
       return json(res, res.status || 200);
     }
 
-    let m = path.match(/^\/api\/moji\/([\w-]{16,40})(\/otkazi)?$/);
+    m = path.match(/^\/api\/moji\/([\w-]{16,40})(\/otkazi)?$/);
     if (m && !m[2] && method === 'GET') { const res = await store.mineChecked(m[1], ip); return json(res, res.status || 200); }
     if (m && m[2] && method === 'POST') {
       const id = Number((await body(request))?.id);
@@ -372,6 +543,30 @@ export default {
         return new Response(exportCsv(await store.exportRows()), { headers: {
           'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
           'Content-Disposition': 'attachment; filename="prijave-advent-2026.csv"' } });
+      }
+      if (route === 'export-tablica.csv' && method === 'GET') {
+        return new Response(sheetCsv(await store.exportRows()), { headers: {
+          'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
+          'Content-Disposition': 'attachment; filename="prijave-za-tablicu.csv"' } });
+      }
+      if (route === 'meni' && method === 'GET') return json(await store.ordersSummary());
+      if (route === 'meni' && method === 'POST') {
+        const list = (await body(request))?.items;
+        const items = Array.isArray(list) && list.length <= 100 ? list.map((x, i) => validItem(x, i)) : null;
+        if (!items || !items.length || items.some(x => !x) || new Set(items.map(x => x.id)).size !== items.length) return json({ error: 'invalid' }, 400);
+        await store.saveMenu(items);
+        return json(await store.ordersSummary());
+      }
+      if (route === 'meni/import' && method === 'POST') {
+        let items;
+        try { items = parseMenuCsv((await body(request))?.csv || ''); } catch (e) { return json({ error: 'csv', message: e.message }, 400); }
+        await store.saveMenu(items);
+        return json(await store.ordersSummary());
+      }
+      if (route === 'narudzbe.csv' && method === 'GET') {
+        return new Response(ordersCsv(await store.exportOrders()), { headers: {
+          'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
+          'Content-Disposition': 'attachment; filename="narudzbe-advent-2026.csv"' } });
       }
       if (route === 'settings' && method === 'POST') {
         const s = validSettings(await body(request));

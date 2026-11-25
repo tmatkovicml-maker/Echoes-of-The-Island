@@ -84,10 +84,11 @@ textarea { min-height: 110px; }
 
 <div id="app" hidden>
 <header><div class="wrap">
-  <h1>Echoes of the Island · prijave smjena</h1>
+  <h1>Echoes of the Island · organizator</h1>
   <nav>
     <button data-tab="slots" aria-current="true">Termini</button>
     <button data-tab="people">Osobe</button>
+    <button data-tab="menu">Jelovnik</button>
     <button data-tab="settings">Postavke</button>
   </nav>
 </div></header>
@@ -96,6 +97,7 @@ textarea { min-height: 110px; }
     <div>Prijave su <span id="openPill" class="pill"></span></div>
     <div class="row">
       <button class="btn" id="exportBtn">⬇ Izvoz CSV (Excel)</button>
+      <button class="btn" id="exportSheetBtn" title="Ime, datum i blok za list Prijave u tablici Advent_2026">⬇ Za tablicu (list Prijave)</button>
       <button class="btn" id="toggleOpen"></button>
     </div>
   </div>
@@ -115,6 +117,49 @@ textarea { min-height: 110px; }
       <h2>Po osobi</h2>
       <p class="note">Sati po ISO tjednu (50: 7.–13.12., 51: 14.–20.12., 52: 21.–27.12., 53: 28.12.–3.1.). Crveno je iznad <span id="maxw">30</span> h tjedno (moguće samo ako je organizator ručno dodao smjenu).</p>
       <div class="scroll"><table id="people"></table></div>
+    </div>
+  </section>
+
+  <section id="tab-menu" hidden>
+    <div class="card openbar">
+      <div>QR narudžbe su <span id="mOpenPill" class="pill"></span></div>
+      <div class="row">
+        <a class="btn" href="/kuhinja" target="_blank" rel="noopener">Ekran narudžbi ↗</a>
+        <a class="btn" href="/meni" target="_blank" rel="noopener">Jelovnik za goste ↗</a>
+        <button class="btn" id="ordersCsv">⬇ Narudžbe CSV</button>
+        <button class="btn" id="mToggle"></button>
+      </div>
+    </div>
+    <p class="note">Gosti skeniraju QR kod, naruče na mobitelu i plaćaju na šanku (gotovina ili kartica) kroz vašu blagajnu. Narudžbe nisu računi.
+      Ekran narudžbi (<b>/kuhinja</b>) otvara se PIN-om osoblja (<b>STAFF_PIN</b> u Cloudflareu) ili ovom lozinkom.</p>
+
+    <div class="card">
+      <h2>Promet po danu</h2>
+      <p class="note">Iznos je zbroj preuzetih narudžbi (informativno, nije fiskalni podatak).</p>
+      <div class="scroll"><table id="mDays"></table></div>
+    </div>
+
+    <form class="card" id="menuForm">
+      <h2>Jelovnik</h2>
+      <p class="note">Promjene se vide gostima čim spremite. „Dostupno” isključite za rasprodano (to može i osoblje na ekranu narudžbi).</p>
+      <div class="scroll"><table id="mItems"></table></div>
+      <p class="row"><button type="button" class="btn" id="mAdd">+ Dodaj stavku</button><button class="btn primary" type="submit">Spremi jelovnik</button></p>
+      <p class="note">Ili učitajte list „Jelovnik” iz tablice spremljen kao CSV (stupci ID, Kategorija, Naziv, Opis, Cijena, Alergeni, Dostupno, Alkohol):
+        <input type="file" id="mCsv" accept=".csv,text/csv,text/plain"></p>
+      <div id="mErr" class="err" hidden></div>
+    </form>
+
+    <div class="card">
+      <h2>QR kod za jelovnik</h2>
+      <div class="qr">
+        <img id="qrMenuImg" alt="QR kod jelovnika">
+        <div>
+          <p>Vodi na: <b id="qrMenuUrl"></b></p>
+          <p class="row"><a class="btn" href="/qr-meni.png?scale=40" download="qr-jelovnik.png">⬇ PNG (≈1500 px)</a>
+          <a class="btn" href="/qr-meni.svg" download="qr-jelovnik.svg">⬇ SVG</a></p>
+          <p class="note">Za pult, stol ili pročelje kućice. Prije tiska skenirajte mobitelom.</p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -152,7 +197,7 @@ textarea { min-height: 110px; }
 
     <div class="card">
       <h2>Termini iz CSV-a</h2>
-      <p class="note">Zamjenjuje termine onima iz datoteke (npr. Termini_prijave.csv). Stupci: Datum, Blok, Od, Do (ili Vrijeme), Sati, Mjesta, po želji Tip dana.
+      <p class="note">Zamjenjuje termine onima iz datoteke (npr. Termini_prijave.csv). Stupci: Datum, Blok, Od, Do (ili Vrijeme), Sati, Mjesta, po želji Tip dana i Događaj.
         Prijave ostaju. Termin koji ima prijave ne može se maknuti.</p>
       <input type="file" id="csvFile" accept=".csv,text/csv,text/plain">
       <div id="csvErr" class="err" hidden style="margin-top:8px"></div>
@@ -217,7 +262,8 @@ $('logout').onclick = () => { try { sessionStorage.removeItem(KEY); } catch {} p
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   tab = b.dataset.tab;
   document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-current', x === b));
-  for (const t of ['slots', 'people', 'settings']) $('tab-' + t).hidden = t !== tab;
+  for (const t of ['slots', 'people', 'menu', 'settings']) $('tab-' + t).hidden = t !== tab;
+  if (tab === 'menu') loadMenu();
 });
 
 function render() {
@@ -252,7 +298,7 @@ function renderDays() {
     const shown = slots.filter(s => (!fFree || s.taken < s.capacity) && (!fPending || (regsBy[s.id] || []).some(r => r.status === 'pending')));
     if (!shown.length) continue;
     const note = slots.map(s => s.note).find(Boolean);
-    html += `<div class="day"><h3>${dayLabel(day)}${note ? ` · ${esc(note)}` : ''}</h3>`;
+    html += `<div class="day"><h3>${dayLabel(day)}${note ? ` · ${esc(note)}` : ''}${slots[0].event ? `<br><span class="note" style="font-weight:400">${esc(slots[0].event)}</span>` : ''}</h3>`;
     for (const s of shown) {
       const regs = regsBy[s.id] || [];
       const cls = s.taken >= s.capacity ? 'full' : s.taken === 0 ? 'empty' : '';
@@ -356,14 +402,16 @@ $('csvFile').onchange = async () => {
   $('csvFile').value = '';
 };
 
-$('exportBtn').onclick = async () => {
-  const r = await fetch('/api/admin/export.csv', { headers: { 'X-Admin-Password': pw } });
+async function download(path, name) {
+  const r = await fetch('/api/admin/' + path, { headers: { 'X-Admin-Password': pw } });
   if (!r.ok) return toast('Izvoz nije uspio.');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(await r.blob());
-  a.download = `prijave-advent-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = name;
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-};
+}
+$('exportBtn').onclick = () => download('export.csv', `prijave-advent-${new Date().toISOString().slice(0, 10)}.csv`);
+$('exportSheetBtn').onclick = () => download('export-tablica.csv', 'prijave-za-tablicu.csv');
 
 $('wipeBtn').onclick = async () => {
   if ($('wipeTxt').value.trim() !== 'OBRIŠI') return toast('Upišite OBRIŠI za potvrdu.');
@@ -371,9 +419,70 @@ $('wipeBtn').onclick = async () => {
   await run(api('wipe', { method: 'POST', body: JSON.stringify({ confirm: 'OBRIŠI' }) })).then(() => { $('wipeTxt').value = ''; toast('Sve prijave su obrisane.'); }).catch(() => {});
 };
 
+// ---------- menu and QR orders ----------
+let mdata = null;
+const eur = n => Number(n).toFixed(2).replace('.', ',') + ' €';
+async function loadMenu() {
+  try { mdata = await api('meni'); renderMenu(); } catch (e) { if (e.message !== 'auth') toast(e.message); }
+}
+function renderMenu() {
+  $('mOpenPill').textContent = mdata.open ? 'OTVORENE' : 'ZATVORENE';
+  $('mOpenPill').className = 'pill ' + (mdata.open ? 'on' : 'off');
+  $('mToggle').textContent = mdata.open ? 'Zatvori narudžbe' : 'Otvori narudžbe';
+  $('mToggle').className = 'btn ' + (mdata.open ? 'danger' : 'primary');
+  $('mDays').innerHTML = '<tr><th>Dan</th><th class="num">Narudžbi</th><th class="num">Otkazano</th><th class="num">Preuzeto (EUR)</th><th>Najviše naručeno</th></tr>'
+    + (mdata.days.map(d => `<tr><td>${dayLabel(d.day)}</td><td class="num">${d.orders}</td><td class="num">${d.cancelled}</td><td class="num"><b>${eur(d.total)}</b></td>
+      <td>${esc(Object.entries(d.items).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n, q]) => q + '× ' + n).join(', '))}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="note">Još nema narudžbi.</td></tr>');
+  renderItems(mdata.menu);
+  $('qrMenuUrl').textContent = location.origin + '/meni';
+  if (!$('qrMenuImg').src) $('qrMenuImg').src = '/qr-meni.svg';
+}
+function renderItems(items) {
+  const inp = (k, v, w, t = 'text') => `<input type="${t}" data-k="${k}" value="${esc(v)}" style="width:${w}"${t === 'text' ? '' : ' step="0.1" min="0"'}>`;
+  $('mItems').innerHTML = '<tr><th>ID</th><th>Kategorija</th><th>Naziv</th><th>Opis</th><th class="num">Cijena €</th><th>Alergeni</th><th>Dostupno</th><th>18+</th><th></th></tr>'
+    + items.map(m => `<tr data-row><td>${inp('id', m.id, '52px')}</td><td>${inp('cat', m.cat, '76px')}</td><td>${inp('name', m.name, '180px')}</td>
+      <td>${inp('descr', m.descr, '170px')}</td><td>${inp('price', m.price, '70px', 'number')}</td><td>${inp('allergens', m.allergens, '120px')}</td>
+      <td><input type="checkbox" data-k="available" ${m.available ? 'checked' : ''}></td><td><input type="checkbox" data-k="alcohol" ${m.alcohol ? 'checked' : ''}></td>
+      <td><button type="button" class="btn small" data-delrow title="Ukloni">✕</button></td></tr>`).join('');
+}
+function readItems() {
+  return [...document.querySelectorAll('#mItems [data-row]')].map(tr => {
+    const o = {};
+    tr.querySelectorAll('[data-k]').forEach(i => o[i.dataset.k] = i.type === 'checkbox' ? i.checked : i.value);
+    return o;
+  });
+}
+$('mItems').addEventListener('click', e => { if (e.target.dataset.delrow !== undefined && confirm('Ukloniti stavku?')) e.target.closest('tr').remove(); });
+$('mAdd').onclick = () => {
+  const items = readItems();
+  let n = 1; while (items.some(i => i.id === 'N' + n)) n++;
+  items.push({ id: 'N' + n, cat: 'Hrana', name: '', descr: '', price: '', allergens: '', available: true, alcohol: false });
+  renderItems(items);
+};
+$('menuForm').onsubmit = async e => {
+  e.preventDefault(); $('mErr').hidden = true;
+  try { mdata = await api('meni', { method: 'POST', body: JSON.stringify({ items: readItems() }) }); renderMenu(); toast('Jelovnik je spremljen.'); }
+  catch (err) { if (err.message !== 'auth') { $('mErr').hidden = false; $('mErr').textContent = 'Provjerite stavke: svaka treba jedinstven ID (slova i brojke), naziv i cijenu.'; } }
+};
+$('mCsv').onchange = async () => {
+  const f = $('mCsv').files[0]; if (!f) return;
+  let txt = await f.text();
+  if (txt.includes('\uFFFD')) txt = new TextDecoder('windows-1250').decode(await f.arrayBuffer());
+  $('mErr').hidden = true;
+  try { mdata = await api('meni/import', { method: 'POST', body: JSON.stringify({ csv: txt }) }); renderMenu(); toast(`Učitano ${mdata.menu.length} stavki.`); }
+  catch (err) { if (err.message !== 'auth') { $('mErr').hidden = false; $('mErr').textContent = err.message; } }
+  $('mCsv').value = '';
+};
+$('mToggle').onclick = async () => {
+  try { await api('settings', { method: 'POST', body: JSON.stringify({ orders_open: !mdata.open }) }); await loadMenu(); } catch {}
+};
+$('ordersCsv').onclick = () => download('narudzbe.csv', `narudzbe-advent-${new Date().toISOString().slice(0, 10)}.csv`);
+
 // refresh every 30 s while the page is open (new sign-ups come in)
 setInterval(async () => {
-  if (document.activeElement && document.activeElement.closest('#days form, #days input, #tab-settings')) return;   // don't disturb typing
+  if (document.activeElement && document.activeElement.closest('#days form, #days input, #tab-settings, #tab-menu')) return;   // don't disturb typing
+  if (tab === 'menu') return loadMenu().catch(() => {});
   if (pw && !document.hidden && !$('app').hidden) { try { data = await api('data'); render(); } catch {} } }, 30000);
 
 (async () => {

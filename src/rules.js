@@ -45,14 +45,14 @@ export const hoursBetween = (start, end) => { let m = toMin(end) - toMin(start);
 // Shift start as a timestamp. December and January are always winter time in Croatia (UTC+1).
 export const slotStartMs = s => Date.parse(`${s.day}T${s.start}:00+01:00`);
 
-export function makeSlot(day, block, start, end, capacity, hours, note = '') {
-  return { id: `${day}-${block}`, day, block, start, end, hours: hours || hoursBetween(start, end), capacity, note };
+export function makeSlot(day, block, start, end, capacity, hours, note = '', event = '') {
+  return { id: `${day}-${block}`, day, block, start, end, hours: hours || hoursBetween(start, end), capacity, note, event };
 }
 
 // ---- the organizer's CSV of shifts ----
 // The columns are recognized by their headings (any order, ";" or "," or tab):
 //   Datum (10.12.2026. / 2026-12-10 / 10.12.), Blok (A/B), Od + Do or Vrijeme ("09:00–16:00"), Sati, Mjesta,
-//   optional Tip dana ("Koncert" is shown to the students). Other columns (Dan, Naziv termina) are ignored.
+//   optional Tip dana ("Koncert" is shown to the students) and Događaj (what is on at the square that day). Other columns (Dan, Naziv termina) are ignored.
 // Without Blok the block follows from the start time (before noon = A). Without Sati the hours follow from the times.
 const fold = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
 
@@ -104,6 +104,7 @@ export function parseSlotsCsv(text) {
   const iHours = find('sati', 'hours', 'trajanje', 'h');
   const iCap = find('mjesta', 'kapacitet', 'broj osoba', 'osoba', 'capacity');
   const iNote = find('tip dana', 'tip', 'vrsta dana', 'napomena');
+  const iEvent = find('dogadaj', 'program');
   if (iDate < 0) throw new Error('Nema stupca s datumom (npr. "Datum").');
   if (iCap < 0) throw new Error('Nema stupca s brojem mjesta (npr. "Mjesta").');
 
@@ -130,7 +131,8 @@ export function parseSlotsCsv(text) {
     const h = iHours >= 0 && String(r[iHours] || '').trim() ? parseNum(r[iHours]) : hoursBetween(start, end);
     if (h === null || h <= 0 || h > 24) return errors.push(`${at}: neispravan broj sati "${r[iHours] || ''}"`);
     const note = iNote >= 0 ? String(r[iNote] || '').trim().slice(0, 40) : '';
-    slots.push(makeSlot(day, block, start, end, cap, h, /^obi[cč]an$/i.test(note) ? '' : note));
+    const ev = iEvent >= 0 ? String(r[iEvent] || '').trim().replace(/^[—–-]$/, '').slice(0, 200) : '';
+    slots.push(makeSlot(day, block, start, end, cap, h, /^obi[cč]an$/i.test(note) ? '' : note, ev));
   });
   const seen = new Set();
   for (const s of slots) { if (seen.has(s.id)) errors.push(`Termin ${s.day} ${s.block} se ponavlja`); seen.add(s.id); }

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="hr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jelovnik · Echoes of the Island</title>
+<meta name="description" content="Naruči hranu i piće u adventskoj kućici Echoes of the Island na Trgu Republike Hrvatske u Malom Lošinju.">
+<meta name="theme-color" content="#0C0F1D">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
+<style>
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.45 Barlow, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+h1, h2, h3 { font-family: "Barlow Condensed", Barlow, system-ui, sans-serif; }
+header { padding: 16px 16px 0; text-align: center; border-bottom: 1px solid var(--line); }
+header .logo { width: 88px; height: 88px; display: block; margin: 0 auto 2px; }
+header .kicker { font: 800 15px/1.2 'Barlow Condensed', sans-serif; letter-spacing: .3em; text-transform: uppercase; color: var(--accent); }
+header h1 { margin: 4px 0 2px; font-size: 34px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+header p { margin: 0; color: var(--muted); font-size: 15px; }
+.lights { display: flex; justify-content: center; gap: 22px; margin: 16px 0 -5px; }
+.lights i { width: 9px; height: 9px; border-radius: 50%; background: var(--lamp); box-shadow: 0 0 10px var(--lamp); }
+.lights i:nth-child(even) { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+main { max-width: 640px; margin: 0 auto; padding: 4px 16px 120px; }
+.banner { border-radius: 12px; padding: 12px 14px; margin: 14px 0; font-weight: 600; }
+.banner.closed { background: var(--accent-soft); color: #FF8CC6; }
+.banner.info { background: var(--warn-soft); color: var(--warn); }
+.banner a { color: inherit; }
+h2.cat { margin: 22px 0 8px; font-size: 24px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.item { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 8px 0;
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; }
+.item.has { border-color: var(--accent); box-shadow: 0 0 12px rgba(255, 42, 150, .35); }
+.item .name { font: 800 20px/1.15 'Barlow Condensed', sans-serif; letter-spacing: .02em; }
+.item .price { font: 800 20px/1.15 'Barlow Condensed', sans-serif; color: var(--lamp); white-space: nowrap; text-align: right; }
+.item .descr { font-size: 15px; color: var(--muted); grid-column: 1; }
+.item .all { font-size: 13px; color: var(--muted); grid-column: 1; }
+.badge { display: inline-block; font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .1em; color: var(--accent); border: 1px solid var(--accent);
+  border-radius: 99px; padding: 3px 7px; margin-left: 6px; vertical-align: 3px; }
+.qty { grid-column: 2; grid-row: 2 / span 2; display: flex; align-items: center; gap: 4px; align-self: end; }
+.qty button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--ink);
+  font: 800 24px/1 'Barlow Condensed', sans-serif; cursor: pointer; touch-action: manipulation; }
+.qty button.plus { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.qty button:disabled { opacity: .35; cursor: not-allowed; }
+.qty span { min-width: 22px; text-align: center; font-weight: 600; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card2); border-top: 1px solid var(--line);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 20px rgba(0,0,0,.45); }
+.bar .wrap { max-width: 640px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.btn { border: 0; background: var(--accent); color: var(--accent-ink); font: 800 19px/1 'Barlow Condensed', system-ui, sans-serif; letter-spacing: .06em;
+  text-transform: uppercase; padding: 14px 18px; border-radius: 12px; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, .qty button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--lamp); outline-offset: 2px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 14px 0; }
+.card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.lines { list-style: none; margin: 0; padding: 0; }
+.lines li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.lines li.total { border-bottom: 0; font-weight: 700; font-size: 19px; }
+label.f { display: block; margin: 12px 0 4px; font-weight: 600; }
+input[type=text], textarea { width: 100%; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); }
+textarea { min-height: 70px; resize: vertical; }
+.pay { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pay label { border: 2px solid var(--line); border-radius: 12px; padding: 12px; text-align: center; font: 800 19px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.pay input { position: absolute; opacity: 0; }
+.pay label:has(input:checked) { border-color: var(--accent); background: var(--sel-soft); }
+.pay label:has(input:focus-visible) { outline: 3px solid var(--lamp); }
+.check { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; }
+.check input { width: 22px; height: 22px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+.note { font-size: 14px; color: var(--muted); }
+.err { background: var(--accent-soft); color: #FF8CC6; border-radius: 10px; padding: 10px 12px; margin: 12px 0; font-weight: 600; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+/* order status */
+.num { text-align: center; padding: 18px 0 6px; }
+.num small { display: block; font: 800 16px/1 'Barlow Condensed', sans-serif; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); }
+.num b { display: block; font: 800 96px/1 'Barlow Condensed', sans-serif; color: var(--ink); }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 4px; }
+.steps div { text-align: center; padding: 10px 4px; border-radius: 10px; background: var(--off); color: var(--off-ink);
+  font: 800 15px/1.1 'Barlow Condensed', sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.steps div.done { background: var(--sel-soft); color: var(--ink); }
+.steps div.now { background: var(--accent); color: var(--accent-ink); }
+.big { text-align: center; font: 800 26px/1.2 'Barlow Condensed', sans-serif; letter-spacing: .03em; margin: 14px 0 6px; }
+.big.ready { color: var(--lamp); text-shadow: 0 0 14px rgba(255, 227, 168, .6); font-size: 32px; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto;
+  background: var(--ink); color: var(--bg); padding: 12px 14px; border-radius: 12px; font-weight: 600; z-index: 9; }
+.loading { text-align: center; color: var(--muted); padding: 40px 0; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <img class="logo" src="/logo.svg" alt="Echoes of the Island">
+  <div class="kicker">Advent na Lošinju</div>
+  <h1>Jelovnik</h1>
+  <p>Naruči mobitelom, a plati pri preuzimanju</p>
+  <div class="lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</header>
+
+<main>
+  <div id="loading" class="loading">Učitavanje…</div>
+
+  <section id="menuView" hidden>
+    <div id="myorders" class="banner info" hidden></div>
+    <div id="closed" class="banner closed" hidden>Narudžbe mobitelom trenutno ne primamo. Naruči na šanku.</div>
+    <div id="items"></div>
+    <p class="note">Cijene su u eurima. Za alergene pitaj osoblje. Alkohol točimo samo osobama starijima od 18 godina.</p>
+  </section>
+
+  <form id="checkout" hidden novalidate>
+    <p style="margin:12px 0 0"><a href="#" id="back" style="color:var(--muted)">← Natrag na jelovnik</a></p>
+    <div class="card">
+      <h2>Tvoja narudžba</h2>
+      <ul class="lines" id="cartLines"></ul>
+    </div>
+    <div class="card">
+      <h2>Plaćanje pri preuzimanju</h2>
+      <div class="pay" role="radiogroup" aria-label="Način plaćanja">
+        <label><input type="radio" name="pay" value="kartica"> Kartica</label>
+        <label><input type="radio" name="pay" value="gotovina"> Gotovina</label>
+      </div>
+      <p class="note">Platiš na šanku kad preuzmeš narudžbu. Račun dobiješ na blagajni.</p>
+      <label class="f" for="name">Ime (da te prozovemo, nije obavezno)</label>
+      <input type="text" id="name" maxlength="30" autocomplete="given-name">
+      <label class="f" for="note">Napomena (nije obavezno)</label>
+      <textarea id="note" maxlength="140" placeholder="npr. bez umaka"></textarea>
+      <div class="hp" aria-hidden="true"><label>Web <input type="text" id="website" tabindex="-1" autocomplete="off"></label></div>
+      <label class="check" id="adultRow" hidden><input type="checkbox" id="adult"><span>Imam navršenih <b>18 godina</b>. Osoblje pri preuzimanju može tražiti osobnu.</span></label>
+      <div id="err" class="err" hidden></div>
+      <button class="btn" id="send" type="submit" style="width:100%;margin-top:8px">Pošalji narudžbu</button>
+    </div>
+  </form>
+
+  <section id="orderView" hidden>
+    <div class="num"><small>Narudžba</small><b id="oNum"></b></div>
+    <div class="steps" id="oSteps"></div>
+    <div class="big" id="oBig"></div>
+    <p class="note" id="oSub" style="text-align:center"></p>
+    <div class="card">
+      <ul class="lines" id="oLines"></ul>
+    </div>
+    <p style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn secondary" type="button" id="oCancel" hidden>Otkaži narudžbu</button>
+      <a class="btn secondary" href="/meni">Nova narudžba</a>
+    </p>
+  </section>
+</main>
+
+<div class="bar" id="bar" hidden><div class="wrap">
+  <div id="sum">Odaberi jelo ili piće</div>
+  <button class="btn" id="next" type="button" disabled>Naruči</button>
+</div></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const eur = n => n.toFixed(2).replace('.', ',') + ' €';
+const LS = 'echoes-narudzbe';
+const loadOrders = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch { return []; } };
+const saveOrder = t => { try { const l = loadOrders().filter(x => x !== t); l.unshift(t); localStorage.setItem(LS, JSON.stringify(l.slice(0, 5))); } catch {} };
+let menu = null, cart = new Map(), toastT;
+
+function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 4000); }
+async function api(path, opts = {}) {
+  try {
+    const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.error) d.error = 'network';
+    return d;
+  } catch { return { error: 'network' }; }
+}
+function errorText(r) {
+  switch (r.error) {
+    case 'closed': return 'Narudžbe mobitelom trenutno ne primamo. Naruči na šanku.';
+    case 'unavailable': return `${r.name || 'Jedna stavka'} upravo nije dostupna. Maknuli smo je iz narudžbe.`;
+    case 'pay': return 'Odaberi kako ćeš platiti: kartica ili gotovina.';
+    case 'adult': return 'Za piće s alkoholom potvrdi da imaš 18 godina.';
+    case 'too_many': return 'Previše narudžbi s ovog uređaja. Pričekaj nekoliko minuta.';
+    case 'started': return 'Narudžba je već u pripremi i ne može se otkazati. Javi se na šanku.';
+    case 'not_found': return 'Narudžba nije pronađena.';
+    default: return 'Nešto nije u redu. Provjeri internetsku vezu i pokušaj ponovno.';
+  }
+}
+
+// ---------- menu ----------
+function render() {
+  $('closed').hidden = menu.open;
+  for (const id of [...cart.keys()]) if (!menu.items.some(i => i.id === id)) cart.delete(id);
+  const cats = [];
+  for (const it of menu.items) { let c = cats.find(c => c.name === it.cat); if (!c) cats.push(c = { name: it.cat, items: [] }); c.items.push(it); }
+  $('items').innerHTML = cats.map(c => `<h2 class="cat">${esc(c.name)}</h2>` + c.items.map(it => {
+    const q = cart.get(it.id) || 0;
+    return `<div class="item${q ? ' has' : ''}" data-id="${esc(it.id)}">
+      <div class="name">${esc(it.name)}${it.alcohol ? '<span class="badge">18+</span>' : ''}</div><div class="price">${eur(it.price)}</div>
+      ${it.descr ? `<div class="descr">${esc(it.descr)}</div>` : ''}${it.allergens ? `<div class="all">Alergeni: ${esc(it.allergens)}</div>` : ''}
+      ${menu.open ? `<div class="qty"><button type="button" data-minus aria-label="Manje: ${esc(it.name)}" ${q ? '' : 'disabled'}>−</button>
+        <span aria-live="polite">${q || ''}</span><button type="button" class="plus" data-plus aria-label="Dodaj: ${esc(it.name)}" ${q >= 10 ? 'disabled' : ''}>+</button></div>` : ''}
+    </div>`;
+  }).join('')).join('') || '<p class="note">Jelovnik je trenutno prazan.</p>';
+  renderBar();
+}
+function cartLines() { return [...cart].map(([id, qty]) => ({ ...menu.items.find(i => i.id === id), qty })).filter(l => l.name); }
+function renderBar() {
+  const lines = cartLines(), n = lines.reduce((s, l) => s + l.qty, 0), total = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  $('bar').hidden = !menu.open || !$('checkout').hidden || !$('orderView').hidden;
+  $('sum').innerHTML = n ? `<b>${n}</b> ${n === 1 ? 'stavka' : n < 5 ? 'stavke' : 'stavki'} · <b>${eur(total)}</b>` : 'Odaberi jelo ili piće';
+  $('next').disabled = !n;
+}
+$('items').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const id = b.closest('.item').dataset.id, q = cart.get(id) || 0;
+  if ('plus' in b.dataset) cart.set(id, Math.min(10, q + 1));
+  if ('minus' in b.dataset) { if (q <= 1) cart.delete(id); else cart.set(id, q - 1); }
+  render();
+});
+
+function showCheckout() {
+  const lines = cartLines(), total = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  $('cartLines').innerHTML = lines.map(l => `<li><span>${l.qty}× ${esc(l.name)}</span><span>${eur(l.qty * l.price)}</span></li>`).join('')
+    + `<li class="total"><span>Ukupno</span><span>${eur(total)}</span></li>`;
+  $('adultRow').hidden = !lines.some(l => l.alcohol);
+  $('menuView').hidden = true; $('checkout').hidden = false; $('err').hidden = true; renderBar();
+  window.scrollTo(0, 0);
+}
+$('next').onclick = showCheckout;
+$('back').onclick = e => { e.preventDefault(); $('checkout').hidden = true; $('menuView').hidden = false; render(); };
+
+$('checkout').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = m => { $('err').textContent = m; $('err').hidden = false; };
+  const pay = (document.querySelector('input[name=pay]:checked') || {}).value;
+  if (!pay) return err(errorText({ error: 'pay' }));
+  if (!$('adultRow').hidden && !$('adult').checked) return err(errorText({ error: 'adult' }));
+  $('send').disabled = true; $('send').textContent = 'Šaljem…';
+  const r = await api('/api/narudzba', { method: 'POST', body: JSON.stringify({
+    items: [...cart].map(([id, qty]) => ({ id, qty })), pay, name: $('name').value, note: $('note').value,
+    adult: $('adult').checked, website: $('website').value }) });
+  $('send').disabled = false; $('send').textContent = 'Pošalji narudžbu';
+  if (r.token) {
+    saveOrder(r.token); cart.clear();
+    history.pushState(null, '', '/narudzba/' + r.token);
+    return showOrder(r.token, r);
+  }
+  if (r.menu) { menu = r.menu; if (r.item) cart.delete(r.item); if (!cart.size) { $('back').click(); } else showCheckout(); }
+  err(errorText(r));
+});
+
+// ---------- my order ----------
+const STEPS = [['nova', 'Zaprimljena'], ['priprema', 'Priprema'], ['spremno', 'Spremno']];
+let pollT, lastStatus;
+function showOrder(token, o) {
+  $('loading').hidden = true; $('menuView').hidden = true; $('checkout').hidden = true; $('orderView').hidden = false; renderBarHidden();
+  $('oNum').textContent = '#' + o.num;
+  const idx = STEPS.findIndex(s => s[0] === o.status);
+  $('oSteps').innerHTML = STEPS.map((s, i) => `<div class="${o.status === 'preuzeto' || i < idx ? 'done' : i === idx ? 'now' : ''}">${s[1]}</div>`).join('');
+  $('oSteps').hidden = o.status === 'otkazano';
+  const big = $('oBig'), sub = $('oSub');
+  big.className = 'big';
+  const payTxt = o.pay === 'kartica' ? 'karticom' : 'gotovinom';
+  if (o.status === 'nova') { big.textContent = 'Narudžba je zaprimljena'; sub.textContent = o.ahead ? `Ispred tebe ${o.ahead === 1 ? 'je 1 narudžba' : `su ${o.ahead} ${o.ahead < 5 ? 'narudžbe' : 'narudžbi'}`}. Ova stranica se sama osvježava.` : 'Ova stranica se sama osvježava.'; }
+  if (o.status === 'priprema') { big.textContent = 'Pripremamo tvoju narudžbu'; sub.textContent = 'Javit ćemo ti ovdje kad bude spremna.'; }
+  if (o.status === 'spremno') { big.textContent = 'Spremno! Dođi na šank'; big.classList.add('ready'); sub.textContent = `Reci broj #${o.num} i plati ${payTxt}.`; }
+  if (o.status === 'preuzeto') { big.textContent = 'Preuzeto. Dobar tek!'; sub.textContent = ''; }
+  if (o.status === 'otkazano') { big.textContent = 'Narudžba je otkazana'; sub.textContent = ''; }
+  $('oLines').innerHTML = o.items.map(i => `<li><span>${i.qty}× ${esc(i.name)}</span><span>${eur(i.qty * i.price)}</span></li>`).join('')
+    + `<li class="total"><span>Ukupno, plaćaš ${payTxt}</span><span>${eur(o.total)}</span></li>`
+    + (o.alcohol ? '<li><span class="note">Za piće s alkoholom pripremi osobnu iskaznicu.</span></li>' : '');
+  $('oCancel').hidden = o.status !== 'nova';
+  $('oCancel').onclick = async () => {
+    if (!confirm('Otkazati narudžbu?')) return;
+    const r = await api(`/api/narudzba/${token}/otkazi`, { method: 'POST', body: '{}' });
+    if (r.num) showOrder(token, r); else toast(errorText(r));
+  };
+  if (lastStatus && lastStatus !== o.status && o.status === 'spremno') { try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch {} }
+  lastStatus = o.status;
+  document.title = o.status === 'spremno' ? `Spremno! #${o.num}` : `Narudžba #${o.num} · Echoes of the Island`;
+  clearTimeout(pollT);
+  if (['nova', 'priprema', 'spremno'].includes(o.status)) pollT = setTimeout(async () => {
+    const r = await api('/api/narudzba/' + token);
+    showOrder(token, r.num ? r : o);
+  }, document.hidden ? 15000 : 5000);
+}
+function renderBarHidden() { $('bar').hidden = true; }
+
+// ---------- start ----------
+(async () => {
+  const m = location.pathname.match(/^\/narudzba\/([\w-]+)$/);
+  if (m) {
+    const r = await api('/api/narudzba/' + m[1]);
+    if (r.num) return showOrder(m[1], r);
+    $('loading').textContent = errorText(r); return;
+  }
+  menu = await api('/api/meni');
+  if (!menu.items) { $('loading').textContent = errorText(menu); return; }
+  $('loading').hidden = true; $('menuView').hidden = false;
+  const mine = loadOrders();
+  if (mine.length) {
+    $('myorders').hidden = false;
+    $('myorders').innerHTML = 'Tvoja narudžba: ' + mine.slice(0, 3).map((t, i) => `<a href="/narudzba/${esc(t)}">${i ? 'prethodna' : 'pogledaj stanje'}</a>`).join(' · ');
+  }
+  render();
+  // the menu changes when something is sold out
+  setInterval(async () => { if (document.hidden || $('menuView').hidden) return; const r = await api('/api/meni'); if (r.items) { menu = r; render(); } }, 30000);
+})();
+window.addEventListener('popstate', () => location.reload());
+</script>
+</body>
+</html>

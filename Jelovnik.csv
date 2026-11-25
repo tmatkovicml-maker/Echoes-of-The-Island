@@ -1,0 +1,15 @@
+﻿ID;Kategorija;Naziv;Opis;Cijena (EUR);Alergeni;Dostupno;Alkohol;Priprema (min)
+H01;Hrana;Kozice u češnjaku;Kozice, češnjak, maslinovo ulje, pecivo;11,00;rakovci, gluten;DA;NE;6
+H02;Hrana;Hot dog s tempura kozicama;Tempura kozice u hot dog pecivu s umakom;9,00;gluten, rakovci, jaja;DA;NE;5
+H03;Hrana;Burger od tune;Tuna burger s dodacima i umakom;10,00;riba, gluten, jaja;DA;NE;6
+H04;Hrana;Lignje frigane;Frigane lignje s limunom;10,00;mekušci, gluten;DA;NE;6
+H05;Hrana;Gostujući mesni specijalitet;Mijenja se po danu (upiši jelo);8,00;ovisi o jelu;NE;NE;5
+S01;Slatko;Slastica (odluči);npr. palačinke — ne ide na fritezu;4,50;gluten, jaja, mlijeko;NE;NE;4
+P01;Piće;Kuhano vino crno 0,2 l;;2,70;sulfiti;DA;DA;1
+P02;Piće;Kuhano vino bijelo 0,2 l;;2,70;sulfiti;DA;DA;1
+P03;Piće;Kuhani gin;;4,60;;DA;DA;2
+P04;Piće;Topla čokolada;;3,00;mlijeko;DA;NE;2
+P05;Piće;Čaj;;2,50;;DA;NE;1
+P06;Piće;Gazirani sok 0,5 l;;3,10;;DA;NE;1
+P07;Piće;Voda 0,5 l;;2,50;;DA;NE;1
+P08;Piće;Pivo 0,3 l;;2,50;gluten;DA;DA;1
