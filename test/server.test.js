@@ -270,6 +270,21 @@ test('extra shifts outside the blocks: every day in a range except the skipped d
   assert.equal((await call('/api/admin/telegram', { admin: true, body: {} })).data.error, 'no_token');
 });
 
+test('pay per person: only in admin, used for the payroll; no pay on the public page', async () => {
+  const pub = JSON.stringify((await call('/api/stanje')).data);
+  assert.ok(!pub.includes('11,15') && !pub.includes('16,73'));
+  await setCap('2026-12-15-A', 9);
+  await signUp(['2026-12-15-A'], phone(6000), 'Rina Rinić');                       // 7 regular hours
+  await call('/api/admin/rate', { admin: true, body: { phone: phone(6000), base: '12', plus: '' } });
+  const p = (await call('/api/admin/data', { admin: true })).data.people.find(x => x.phone_fmt === phone(6000));
+  assert.deepEqual(p.rate, { base: 12, plus: 18, own: true });
+  assert.equal(p.net, 7 * 12);
+  const csv = await fetch(BASE + '/api/admin/obracun.csv', { headers: { 'X-Admin-Password': PW } }).then(r => r.text());
+  assert.ok(csv.includes('Rina Rinić;' + phone(6000) + ';Student (SCRI);2026;7;0;7;12;18;84'));
+  await call('/api/admin/rate', { admin: true, body: { phone: phone(6000), base: null } });
+  assert.equal((await call('/api/admin/data', { admin: true })).data.people.find(x => x.phone_fmt === phone(6000)).rate.own, false);
+});
+
 test('per-IP limit on sign-ups', async () => {
   const one = [];
   for (let i = 0; i < 17; i++) one.push(await call('/api/prijava', { ip: '10.200.0.1', body: { name: 'Spam Spam', phone: phone(2000 + i), slots: ['2027-01-02-A'], kind: 'student', adult: true, consent: true } }));

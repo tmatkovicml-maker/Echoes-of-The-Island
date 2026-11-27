@@ -36,7 +36,7 @@ Kasnije promjene:
 |---|---|---|
 | Rok za otkazivanje | **48 h** prije početka smjene | Poslije toga učenik ne može sam otkazati, nego se javlja organizatoru. 0 znači da može otkazati sve do početka smjene. |
 | Ručna potvrda | **isključena**, prijava vrijedi odmah | Ako je uključite, svaka prijava čeka vašu potvrdu, ali mjesto je već zauzeto. Učenik stanje vidi na svojoj poveznici. |
-| Satnica i uvjeti rada | 11,15 € neto/h, 16,73 € noću, nedjeljom i blagdanom, i preko kojeg servisa | Prikazuje se na stranici prijava. Može se promijeniti ili obrisati. |
+| Uvjeti (tekst na stranici prijava) | preko kojeg servisa se radi; „Satnicu dogovaramo sa svakim osobno” | Satnica se ne prikazuje javno. |
 | Organizator | prazno | Naziv i kontakt za obavijest o privatnosti. |
 | Automatsko brisanje | **31. 1. 2027.** | Tog dana se brišu sva imena i mobiteli, a prijave se zatvaraju. |
 
@@ -48,7 +48,7 @@ Kasnije promjene:
   - Ne zauzimaju mjesto u bloku i ne ulaze u obračun servisima.
 
 ## Obračun sati za servise
-`/admin` → **Osobe** → **⬇ Obračun sati za servise (CSV)**. Za svaku osobu i godinu daje: servis, redovne sate, sate uz +50 % (noću 22–06, nedjeljom, blagdanom 25. 12., 26. 12. i 1. 1.), ukupno i procjenu neto iznosa (11,15 € i 16,73 € po satu). Prosinac 2026. i siječanj 2027. su u odvojenim recima, jer se godine obračunavaju posebno. Na primjer, blok B 31. 12. daje 6 redovnih sati i 2 sata +50 % u 2026. te 3 sata +50 % u 2027. Iste brojke vide se u tablici na kartici Osobe.
+`/admin` → **Osobe** → **⬇ Obračun sati za servise (CSV)**. Za svaku osobu i godinu daje: servis, redovne sate, sate uz +50 % (noću 22–06, nedjeljom, blagdanom 25. 12., 26. 12. i 1. 1.), ukupno, satnicu te osobe i procjenu neto iznosa. **Satnicu svake osobe** (redovno / +50 %) upisujete na kartici Osobe i vidite je samo vi. Zadano je 11,15 / 16,73 €, a prazno +50 % znači 1,5 × redovno. Prosinac 2026. i siječanj 2027. su u odvojenim recima, jer se godine obračunavaju posebno. Na primjer, blok B 31. 12. daje 6 redovnih sati i 2 sata +50 % u 2026. te 3 sata +50 % u 2027. Iste brojke vide se u tablici na kartici Osobe.
 
 ## Tablica Advent_2026 (list „Prijave”)
 U `/admin` gumb **⬇ Za tablicu (list Prijave)** daje CSV sa stupcima *Ime i prezime; Datum; Blok*, s datumom u obliku `2026-12-10`, koji Excel čita kao datum.

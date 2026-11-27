@@ -51,13 +51,17 @@ import {
 } from './rules.js';
 
 const MINUTE = 60 * 1000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
+const TERMS_DEFAULT = 'Studenti rade preko Student servisa Rijeka (SCRI), punoljetni učenici preko Učeničkog servisa Dom mladih Rijeka.\n'
+  + 'Satnicu dogovaramo sa svakim osobno.';
+// the earlier default text showed the pay publicly; a database that still holds it gets the new text
+const TERMS_WITH_PAY = 'Satnica: 11,15 € neto po satu.\nNoću (22–06 h), nedjeljom i blagdanom (25. 12., 26. 12., 1. 1.): 16,73 € neto po satu (+50 %).\n'
+  + 'Studenti rade preko Student servisa Rijeka (SCRI), punoljetni učenici preko Učeničkog servisa Dom mladih Rijeka.';
 const DEFAULTS = {
   open: true,             // sign-up open
   cancel_hours: 48,       // a student can cancel until this many hours before the shift starts
   manual: false,          // false: a sign-up counts at once; true: the organizer confirms each one (it holds the place meanwhile)
-  // pay and conditions, shown on the sign-up page (the organizer can change or empty it in /admin)
-  terms: 'Satnica: 11,15 € neto po satu.\nNoću (22–06 h), nedjeljom i blagdanom (25. 12., 26. 12., 1. 1.): 16,73 € neto po satu (+50 %).\n'
-    + 'Studenti rade preko Student servisa Rijeka (SCRI), punoljetni učenici preko Učeničkog servisa Dom mladih Rijeka.',
+  // conditions shown on the sign-up page; no pay: each person's pay is set in /admin and seen only by the organizer
+  terms: TERMS_DEFAULT,
   organizer: '',          // who collects the data (privacy notice)
   wipe_on: '2027-01-31',  // names and phones are deleted automatically on this day
   orders_open: false,     // QR orders are taken (switched on the hut's screen or in /admin)
@@ -108,6 +112,9 @@ export class Store extends DurableObject {
     // shifts outside the A/B blocks, set by the organizer (his own hours: buying in, opening, afternoons)
     this.sql.exec(`CREATE TABLE IF NOT EXISTS extras (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, name TEXT NOT NULL,
       start TEXT NOT NULL, "end" TEXT NOT NULL, label TEXT NOT NULL DEFAULT '')`);
+    // pay per person (net €/h, regular and +50 %), set by the organizer; anyone without one gets PAY_BASE / PAY_PLUS
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS rates (phone TEXT PRIMARY KEY, base REAL NOT NULL, plus REAL NOT NULL)`);
+    if (this.get('terms') === TERMS_WITH_PAY) this.put('terms', TERMS_DEFAULT);
     if (this.sql.exec('SELECT COUNT(*) AS n FROM menu').one().n === 0) this.writeMenu(parseMenuCsv(JELOVNIK_CSV));
     if (this.sql.exec('SELECT COUNT(*) AS n FROM slots').one().n === 0) this.insertSlots(parseSlotsCsv(TERMINI_CSV));
   }
@@ -229,7 +236,8 @@ export class Store extends DurableObject {
   }
   // one per phone number: hours per ISO week, in total, and for the payroll (regular / +50 %, per calendar year)
   people(regs) {
-    const people = {};
+    const people = {}, rates = {};
+    for (const r of this.sql.exec('SELECT phone, base, plus FROM rates').toArray()) rates[r.phone] = r;
     for (const r of regs) {
       const p = people[r.phone] ||= { phone: r.phone, phone_fmt: formatPhone(r.phone), name: r.name, kind: r.kind, shifts: [], total: 0, pay: {} };
       p.name = r.name; p.kind = r.kind;
@@ -243,7 +251,9 @@ export class Store extends DurableObject {
     for (const p of Object.values(people)) {
       p.weeks = weekHours(p.shifts);
       p.over = Object.values(p.weeks).some(h => h > MAX_WEEK_HOURS);
-      p.net = Math.round(Object.values(p.pay).reduce((s, h) => s + h.reg * PAY_BASE + h.plus * PAY_PLUS, 0) * 100) / 100;
+      const rate = rates[p.phone] || { base: PAY_BASE, plus: PAY_PLUS };
+      p.rate = { base: rate.base, plus: rate.plus, own: !!rates[p.phone] };
+      p.net = Math.round(Object.values(p.pay).reduce((s, h) => s + h.reg * rate.base + h.plus * rate.plus, 0) * 100) / 100;
     }
     return Object.values(people).sort((a, b) => a.name.localeCompare(b.name, 'hr'));
   }
@@ -386,6 +396,12 @@ export class Store extends DurableObject {
   }
   exportOrders() { return this.sql.exec('SELECT day, num, items, total, pay, status, created FROM orders ORDER BY created').toArray(); }
 
+  setRate(phone, base, plus) {
+    if (base === null) this.sql.exec('DELETE FROM rates WHERE phone = ?', phone);
+    else this.sql.exec('INSERT INTO rates (phone, base, plus) VALUES (?, ?, ?) ON CONFLICT(phone) DO UPDATE SET base = excluded.base, plus = excluded.plus', phone, base, plus);
+    return this.adminData();
+  }
+
   // ---- extra shifts outside the blocks (organizer only) ----
   addExtras(name, days, ranges) {
     this.ctx.storage.transactionSync(() => {
@@ -404,6 +420,7 @@ export class Store extends DurableObject {
   // ---- privacy: names and phones are deleted on wipe_on (or now, from /admin) ----
   wipe() {
     this.sql.exec('DELETE FROM extras');
+    this.sql.exec('DELETE FROM rates');
     this.sql.exec(`UPDATE orders SET name = '', note = ''`);
     this.sql.exec('DELETE FROM regs');
     this.sql.exec('DELETE FROM limits');
@@ -512,10 +529,11 @@ function payrollCsv(people) {
   const q = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const n = v => String(Math.round(v * 100) / 100).replace('.', ',');
   const out = [['Ime i prezime', 'Mobitel', 'Servis', 'Godina', 'Redovni sati', 'Sati +50 %', 'Ukupno sati',
-    `Procjena neto (EUR, ${n(PAY_BASE)} / ${n(PAY_PLUS)})`]];
+    'Satnica (EUR/h)', 'Satnica +50 % (EUR/h)', 'Procjena neto (EUR)']];
   for (const p of people) {
     for (const [y, h] of Object.entries(p.pay).sort()) {
-      out.push([p.name, p.phone_fmt, KIND_HR[p.kind] || p.kind, y, n(h.reg), n(h.plus), n(h.reg + h.plus), n(h.reg * PAY_BASE + h.plus * PAY_PLUS)]);
+      out.push([p.name, p.phone_fmt, KIND_HR[p.kind] || p.kind, y, n(h.reg), n(h.plus), n(h.reg + h.plus),
+        n(p.rate.base), n(p.rate.plus), n(h.reg * p.rate.base + h.plus * p.rate.plus)]);
     }
   }
   return '\uFEFF' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';
@@ -660,6 +678,16 @@ export default {
         return json({ chats: chats.map(c => c.name) });
       }
       if (route === 'telegram' && method === 'DELETE') { await store.saveTelegramChats([]); return json({ chats: [] }); }
+      if (route === 'rate' && method === 'POST') {
+        const b = await body(request) || {};
+        const phone = normalizePhone(b.phone);
+        if (!phone) return json({ error: 'phone' }, 400);
+        if (b.base === null || b.base === '') return json(await store.setRate(phone, null, null));
+        const base = Math.round(Number(String(b.base).replace(',', '.')) * 100) / 100;
+        const plus = b.plus === '' || b.plus == null ? Math.round(base * 1.5 * 100) / 100 : Math.round(Number(String(b.plus).replace(',', '.')) * 100) / 100;
+        if (!(base > 0 && base < 200 && plus > 0 && plus < 300)) return json({ error: 'invalid' }, 400);
+        return json(await store.setRate(phone, base, plus));
+      }
       if (route === 'extras' && method === 'POST') {
         const b = await body(request) || {};
         const name = str(b.name, 40), ranges = parseRanges(b.times);

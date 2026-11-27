@@ -67,9 +67,9 @@ h1 em { font-style: normal; color: var(--pink); }
   <div class="when">Echoes of the Island · Trg Republike Hrvatske · 10. 12. 2026. – 2. 1. 2027.</div>
   <div style="margin-top:4mm">${lights(11)}</div>
   <div class="facts">
-    <div class="fact"><b>11,15 € neto / sat</b><span>16,73 € noću, nedjeljom i blagdanom.</span></div>
+    <div class="fact"><b>Koncertne večeri</b><span>Ciplići, Mišomanija, Dellboys, Macaklini i doček Nove godine.</span></div>
     <div class="fact"><b>Sam biraš smjene</b><span>Blok A 09–16 h ili blok B 16–24 h. Bez računa, s mobitela.</span></div>
-    <div class="fact"><b>Najviše 30 h tjedno</b><span>Jedan blok dnevno. Koncertne večeri i doček Nove godine.</span></div>
+    <div class="fact"><b>Najviše 30 h tjedno</b><span>Jedan blok dnevno, uz odmor od 12 sati između smjena.</span></div>
     <div class="fact"><b>Studenti i učenici 18+</b><span>Studenti od 10. 12. (Student servis), učenici od 24. 12. (Dom mladih).</span></div>
   </div>
   <div class="qrrow">

@@ -131,7 +131,8 @@ textarea { min-height: 110px; }
       <h2>Po osobi</h2>
       <p class="row"><button class="btn" id="payrollBtn">⬇ Obračun sati za servise (CSV)</button></p>
       <p class="note">Za obračun: redovni sati i sati uz +50 % (noću 22–06, nedjeljom, blagdanom 25. 12., 26. 12. i 1. 1.), odvojeno za prosinac (XII) i siječanj (I), jer se godine obračunavaju posebno.
-        Procjena neto: 11,15 € i 16,73 € po satu. SCRI-ju šaljete studente, a Domu mladih učenike. „Drugo” ne ide servisima.</p>
+        SCRI-ju šaljete studente, a Domu mladih učenike. „Drugo” ne ide servisima.</p>
+      <p class="note"><b>Satnica €/h</b> (redovno / +50 %) upisuje se za svaku osobu i vidite je samo vi. Prazno znači zadanu satnicu (11,15 / 16,73), a prazno +50 % računa se kao 1,5 × redovno. Ulazi u procjenu neto i u obračun.</p>
       <p class="note">Sati po ISO tjednu (50: 7.–13.12., 51: 14.–20.12., 52: 21.–27.12., 53: 28.12.–3.1.). Crveno je iznad <span id="maxw">30</span> h tjedno (moguće samo ako je organizator ručno dodao smjenu).</p>
       <div class="scroll"><table id="people"></table></div>
     </div>
@@ -201,7 +202,7 @@ textarea { min-height: 110px; }
       <label class="f"><input type="checkbox" id="sManual"> Ručno potvrđujem svaku prijavu</label>
       <div class="note">Prijava koja čeka potvrdu svejedno zauzima mjesto. Učenik stanje vidi na svojoj poveznici.</div>
       <label class="f" for="sTerms">Satnica i uvjeti rada (prikazuje se učenicima samo ako je upisano)</label>
-      <textarea id="sTerms" maxlength="2000" placeholder="npr. Satnica: 6 € neto po satu. Isplata preko student servisa do 15.1.2027."></textarea>
+      <textarea id="sTerms" maxlength="2000" placeholder="npr. Studenti preko SCRI-ja, učenici preko Doma mladih. Satnicu dogovaramo osobno."></textarea>
       <label class="f" for="sOrg">Organizator (za obavijest o privatnosti)</label>
       <input type="text" id="sOrg" maxlength="400" placeholder="npr. Tvrtka d.o.o., Mali Lošinj, mob. 091 …">
       <label class="f" for="sWipe">Automatsko brisanje imena i mobitela</label>
@@ -430,16 +431,24 @@ function renderPeople() {
   const n = v => String(Math.round(v * 100) / 100).replace('.', ',');
   const ph = (p, y, k) => (p.pay[y] ? p.pay[y][k] : 0);
   $('people').innerHTML = `<tr><th>Ime i prezime</th><th>Mobitel</th><th>Servis</th>${weeks.map(w => `<th class="num">T${w.slice(-2)}</th>`).join('')}<th class="num">Ukupno</th>
-      <th class="num" title="Redovni sati / sati +50 % u prosincu">XII red. / +50%</th><th class="num" title="Redovni sati / sati +50 % u siječnju">I red. / +50%</th><th class="num">≈ neto</th><th>Smjene</th></tr>`
+      <th class="num" title="Redovni sati / sati +50 % u prosincu">XII red. / +50%</th><th class="num" title="Redovni sati / sati +50 % u siječnju">I red. / +50%</th><th class="num" title="Neto €/h: redovno / +50 % (prazno +50 % = 1,5 × redovno)">Satnica €/h</th><th class="num">≈ neto</th><th>Smjene</th></tr>`
     + data.people.map(p => `<tr class="${p.over ? 'over' : ''}"><td><b>${esc(p.name)}</b>${p.over ? ' <span class="over-txt">⚠ iznad limita</span>' : ''}</td>
       <td><a href="tel:${esc(p.phone)}">${esc(p.phone_fmt)}</a></td><td>${KIND[p.kind] || ''}</td>
       ${weeks.map(w => { const h = p.weeks[w] || 0; return `<td class="num${h > data.max_week ? ' over-txt' : ''}">${h ? hrs(h) : '–'}</td>`; }).join('')}
       <td class="num"><b>${hrs(p.total)}</b></td>
       <td class="num">${n(ph(p, '2026', 'reg'))} / ${n(ph(p, '2026', 'plus'))}</td><td class="num">${n(ph(p, '2027', 'reg'))} / ${n(ph(p, '2027', 'plus'))}</td>
+      <td class="num" style="white-space:nowrap"><input class="rate" data-phone="${esc(p.phone)}" data-k="base" value="${p.rate.own ? n(p.rate.base) : ''}" placeholder="${n(data.pay.base)}" inputmode="decimal" style="width:58px" aria-label="Satnica ${esc(p.name)}">
+        / <input class="rate" data-phone="${esc(p.phone)}" data-k="plus" value="${p.rate.own ? n(p.rate.plus) : ''}" placeholder="${n(p.rate.own ? p.rate.base * 1.5 : data.pay.plus)}" inputmode="decimal" style="width:58px" aria-label="Satnica +50 % ${esc(p.name)}"></td>
       <td class="num">${n(p.net)} €</td>
       <td>${p.shifts.sort((a, b) => a.id.localeCompare(b.id)).map(s => shortDay(s.day) + s.id.slice(-1)).join(', ')}</td></tr>`).join('')
-    + (data.people.length ? '' : '<tr><td colspan="13" class="note">Još nema prijava.</td></tr>');
+    + (data.people.length ? '' : '<tr><td colspan="14" class="note">Još nema prijava.</td></tr>');
 }
+$('people').addEventListener('change', async e => {
+  const i = e.target; if (!i.classList.contains('rate')) return;
+  const row = i.closest('tr'), base = row.querySelector('[data-k=base]').value.trim(), plus = row.querySelector('[data-k=plus]').value.trim();
+  try { data = await api('rate', { method: 'POST', body: JSON.stringify({ phone: i.dataset.phone, base: base || null, plus }) }); render(); toast(base ? 'Satnica je spremljena.' : 'Vraćena zadana satnica.'); }
+  catch (err) { if (err.message !== 'auth') toast('Satnica nije ispravna (npr. 11,15).'); }
+});
 function isoWeek(day) {
   const d = new Date(day + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7 + 3);
@@ -567,7 +576,7 @@ $('ordersCsv').onclick = () => download('narudzbe.csv', `narudzbe-advent-${new D
 
 // refresh every 30 s while the page is open (new sign-ups come in)
 setInterval(async () => {
-  if (document.activeElement && document.activeElement.closest('#days form, #days input, #tab-settings, #tab-menu')) return;   // don't disturb typing
+  if (document.activeElement && document.activeElement.closest('#days form, #days input, #tab-settings, #tab-menu, #people input')) return;   // don't disturb typing
   if (tab === 'menu') return loadMenu().catch(() => {});
   if (pw && !document.hidden && !$('app').hidden) { try { data = await api('data'); render(); } catch {} } }, 30000);
 
