@@ -38,3 +38,15 @@ test('menu item validation', () => {
   assert.equal(validItem({ id: 'A1', name: '', price: 1 }), null);
   assert.equal(validItem({ id: 'A1', name: 'X', price: -1 }), null);
 });
+
+test('FreshPay export rows: VAT by category, PNP 3 % where marked', async () => {
+  const { freshPayRows, FRESHPAY_HEAD } = await import('../src/orders.js');
+  const rows = freshPayRows(menu);
+  assert.equal(FRESHPAY_HEAD.length, 20);
+  const by = id => rows.find(r => r[0] === id);
+  assert.deepEqual(by('H01').slice(0, 6), ['H01', 'Kozice u češnjaku', null, 11, '13%', null]);
+  assert.deepEqual(by('P01').slice(3, 6), [2.7, '25%', 0.03]);
+  assert.equal(by('P04')[5], null);                 // hot chocolate: no PNP
+  assert.equal(by('S01')[4], '13%');
+  assert.deepEqual(by('P08').slice(9, 14), ['Piće', 'Y', 'Komad', null, 'Vlastito skladište']);
+});

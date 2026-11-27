@@ -145,6 +145,7 @@ textarea { min-height: 110px; }
         <a class="btn" href="/kuhinja" target="_blank" rel="noopener">Ekran narudžbi ↗</a>
         <a class="btn" href="/meni" target="_blank" rel="noopener">Jelovnik za goste ↗</a>
         <button class="btn" id="ordersCsv">⬇ Narudžbe CSV</button>
+        <button class="btn" id="freshPay" title="Jelovnik u obliku predloška za uvoz artikala u A1 FreshPay Back Office">⬇ Izvoz za Fresh Pay</button>
         <button class="btn" id="mToggle"></button>
       </div>
     </div>
@@ -159,7 +160,9 @@ textarea { min-height: 110px; }
 
     <form class="card" id="menuForm">
       <h2>Jelovnik</h2>
-      <p class="note">Promjene se vide gostima čim spremite. „Dostupno” isključite za rasprodano (to može i osoblje na ekranu narudžbi).</p>
+      <p class="note">Promjene se vide gostima čim spremite. „Dostupno” isključite za rasprodano (to može i osoblje na ekranu narudžbi).
+        <b>PNP</b> = porez na potrošnju 3 % (alkohol, sokovi, voda). <b>⬇ Izvoz za Fresh Pay</b> daje cijeli jelovnik kao datoteku za uvoz artikala u FreshPay Back Office:
+        PDV 13 % za kategorije Hrana i Slatko, 25 % za ostalo, i PNP 3 % gdje je označen. Šifre su iste kao ID ovdje. Stavke koje ne želite na blagajni prvo maknite ili preimenujte.</p>
       <div class="scroll"><table id="mItems"></table></div>
       <p class="row"><button type="button" class="btn" id="mAdd">+ Dodaj stavku</button><button class="btn primary" type="submit">Spremi jelovnik</button></p>
       <p class="note">Ili učitajte list „Jelovnik” iz tablice spremljen kao CSV (stupci ID, Kategorija, Naziv, Opis, Cijena, Alergeni, Dostupno, Alkohol):
@@ -530,10 +533,10 @@ function renderMenu() {
 }
 function renderItems(items) {
   const inp = (k, v, w, t = 'text') => `<input type="${t}" data-k="${k}" value="${esc(v)}" style="width:${w}"${t === 'text' ? '' : ' step="0.1" min="0"'}>`;
-  $('mItems').innerHTML = '<tr><th>ID</th><th>Kategorija</th><th>Naziv</th><th>Opis</th><th class="num">Cijena €</th><th>Alergeni</th><th>Dostupno</th><th>18+</th><th></th></tr>'
+  $('mItems').innerHTML = '<tr><th>ID</th><th>Kategorija</th><th>Naziv</th><th>Opis</th><th class="num">Cijena €</th><th>Alergeni</th><th>Dostupno</th><th>18+</th><th title="Porez na potrošnju 3 % (pića u ugostiteljstvu)">PNP</th><th></th></tr>'
     + items.map(m => `<tr data-row><td>${inp('id', m.id, '52px')}</td><td>${inp('cat', m.cat, '76px')}</td><td>${inp('name', m.name, '180px')}</td>
       <td>${inp('descr', m.descr, '170px')}</td><td>${inp('price', m.price, '70px', 'number')}</td><td>${inp('allergens', m.allergens, '120px')}</td>
-      <td><input type="checkbox" data-k="available" ${m.available ? 'checked' : ''}></td><td><input type="checkbox" data-k="alcohol" ${m.alcohol ? 'checked' : ''}></td>
+      <td><input type="checkbox" data-k="available" ${m.available ? 'checked' : ''}></td><td><input type="checkbox" data-k="alcohol" ${m.alcohol ? 'checked' : ''}></td><td><input type="checkbox" data-k="pnp" ${m.pnp ? 'checked' : ''}></td>
       <td><button type="button" class="btn small" data-delrow title="Ukloni">✕</button></td></tr>`).join('');
 }
 function readItems() {
@@ -547,7 +550,7 @@ $('mItems').addEventListener('click', e => { if (e.target.dataset.delrow !== und
 $('mAdd').onclick = () => {
   const items = readItems();
   let n = 1; while (items.some(i => i.id === 'N' + n)) n++;
-  items.push({ id: 'N' + n, cat: 'Hrana', name: '', descr: '', price: '', allergens: '', available: true, alcohol: false });
+  items.push({ id: 'N' + n, cat: 'Hrana', name: '', descr: '', price: '', allergens: '', available: true, alcohol: false, pnp: false });
   renderItems(items);
 };
 $('menuForm').onsubmit = async e => {
@@ -572,6 +575,7 @@ $('tgConnect').onclick = async () => {
   catch (e) { if (e.message !== 'auth') toast(e.error === 'no_token' ? 'Prvo dodajte TELEGRAM_BOT_TOKEN u Cloudflare.' : e.error === 'bad_token' ? 'Token nije ispravan.' : e.message); }
 };
 $('tgOff').onclick = async () => { if (confirm('Isključiti Telegram obavijesti?')) { await api('telegram', { method: 'DELETE' }).catch(() => {}); loadMenu(); } };
+$('freshPay').onclick = () => download('freshpay.xlsx', 'FreshPay-artikli-Echoes.xlsx');
 $('ordersCsv').onclick = () => download('narudzbe.csv', `narudzbe-advent-${new Date().toISOString().slice(0, 10)}.csv`);
 
 // refresh every 30 s while the page is open (new sign-ups come in)

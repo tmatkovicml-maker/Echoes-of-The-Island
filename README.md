@@ -65,6 +65,12 @@ Za svaku novu narudžbu stiže poruka na Telegram: broj, stavke, iznos, kartica 
 4. Kliknite admin → **Jelovnik** → **Poveži**. **Isključi obavijesti** ih gasi.
 
 ## Blagajne (A1 Fresh Pay)
+**Artikli u Fresh Payu bez tipkanja:** admin → Jelovnik → **⬇ Izvoz za Fresh Pay** daje datoteku u obliku FreshPayeva predloška za uvoz artikala (LoaderHR.xlsx), koja se učitava u FreshPay Back Office.
+- Šifra je isti ID kao na jelovniku (H01, P01…).
+- PDV je 13 % za kategorije Hrana i Slatko, a 25 % za pića.
+- PNP od 3 % (porez na potrošnju, Mali Lošinj) dobivaju stavke označene kvačicom PNP u jelovniku: alkohol, sokovi i voda, ali ne čaj i topla čokolada.
+- Nakon promjene cijena ponovno preuzmite i učitajte datoteku.
+
 QR narudžbe nisu računi. Račun se izdaje na jednom od dva A1 Fresh Pay uređaja: jedan prima samo gotovinu, a drugi gotovinu i kartice. Na ekranu narudžbi narudžba plaćena karticom ima oznaku **„Kartica · blagajna s karticom”**, pa osoblje zna na kojem uređaju je naplatiti.
 
 ## QR narudžbe (jelovnik)

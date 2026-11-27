@@ -23,6 +23,7 @@
 //   GET  /api/admin/export-tablica.csv  Ime i prezime;Datum;Blok for pasting into the "Prijave" sheet of the planning workbook
 //   GET  /api/admin/meni                 menu and orders per day · POST {items} save the menu · POST meni/import {csv}
 //   GET  /api/admin/narudzbe.csv         all orders for Excel
+//   GET  /api/admin/freshpay.xlsx        the menu as A1 FreshPay's article import file (VAT 13/25 %, PNP 3 %)
 //   POST /api/admin/extras               {name, times, from, to, skip}  shifts outside the blocks (organizer's own hours)
 //   POST /api/admin/extras/delete        {ids}
 //   POST|DELETE /api/admin/telegram      connect / disconnect Telegram messages for new orders (TELEGRAM_BOT_TOKEN)
@@ -44,7 +45,8 @@ import TERMINI_CSV from '../Termini_prijave.csv';   // the organizer's 48 shifts
 import JELOVNIK_CSV from '../Jelovnik.csv';          // the menu for QR orders, loaded into an empty database
 import MENU_PAGE from './menu.html';
 import KITCHEN_PAGE from './kitchen.html';
-import { STATUSES, PAY, businessDay, validItem, parseMenuCsv, priceOrder, ordersCsv } from './orders.js';
+import { STATUSES, PAY, businessDay, validItem, parseMenuCsv, priceOrder, ordersCsv, FRESHPAY_HEAD, freshPayRows } from './orders.js';
+import { xlsx } from './xlsx.js';
 import {
   MAX_WEEK_HOURS, KINDS, PAY_BASE, PAY_PLUS, normalizePhone, formatPhone, isoWeek, isDay, checkChoice, weekHours, payHours,
   parseSlotsCsv, parseDate, addDays, slotStartMs,
@@ -103,7 +105,7 @@ export class Store extends DurableObject {
     }
     // QR orders: the menu, and the orders (name is only a first name to call out, optional)
     this.sql.exec(`CREATE TABLE IF NOT EXISTS menu (id TEXT PRIMARY KEY, sort INTEGER NOT NULL, cat TEXT NOT NULL, name TEXT NOT NULL,
-      descr TEXT NOT NULL, price REAL NOT NULL, allergens TEXT NOT NULL, available INTEGER NOT NULL, alcohol INTEGER NOT NULL)`);
+      descr TEXT NOT NULL, price REAL NOT NULL, allergens TEXT NOT NULL, available INTEGER NOT NULL, alcohol INTEGER NOT NULL, pnp INTEGER NOT NULL DEFAULT 0)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, num INTEGER NOT NULL,
       token TEXT NOT NULL UNIQUE, items TEXT NOT NULL, total REAL NOT NULL, alcohol INTEGER NOT NULL, pay TEXT NOT NULL,
       name TEXT NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL)`);
@@ -115,6 +117,11 @@ export class Store extends DurableObject {
     // pay per person (net €/h, regular and +50 %), set by the organizer; anyone without one gets PAY_BASE / PAY_PLUS
     this.sql.exec(`CREATE TABLE IF NOT EXISTS rates (phone TEXT PRIMARY KEY, base REAL NOT NULL, plus REAL NOT NULL)`);
     if (this.get('terms') === TERMS_WITH_PAY) this.put('terms', TERMS_DEFAULT);
+    if (!this.sql.exec('PRAGMA table_info(menu)').toArray().some(c => c.name === 'pnp')) {
+      // a menu from before PNP was kept: add it and mark the items the starting menu marks
+      this.sql.exec('ALTER TABLE menu ADD COLUMN pnp INTEGER NOT NULL DEFAULT 0');
+      for (const m of parseMenuCsv(JELOVNIK_CSV)) if (m.pnp) this.sql.exec('UPDATE menu SET pnp = 1 WHERE id = ?', m.id);
+    }
     if (this.sql.exec('SELECT COUNT(*) AS n FROM menu').one().n === 0) this.writeMenu(parseMenuCsv(JELOVNIK_CSV));
     if (this.sql.exec('SELECT COUNT(*) AS n FROM slots').one().n === 0) this.insertSlots(parseSlotsCsv(TERMINI_CSV));
   }
@@ -315,13 +322,13 @@ export class Store extends DurableObject {
 
   // ---- QR orders ----
   menu() {
-    return this.sql.exec('SELECT id, cat, name, descr, price, allergens, available, alcohol FROM menu ORDER BY sort').toArray()
-      .map(m => ({ ...m, available: !!m.available, alcohol: !!m.alcohol }));
+    return this.sql.exec('SELECT id, cat, name, descr, price, allergens, available, alcohol, pnp FROM menu ORDER BY sort').toArray()
+      .map(m => ({ ...m, available: !!m.available, alcohol: !!m.alcohol, pnp: !!m.pnp }));
   }
   writeMenu(items) {
     this.sql.exec('DELETE FROM menu');
-    items.forEach((m, i) => this.sql.exec(`INSERT INTO menu (id, sort, cat, name, descr, price, allergens, available, alcohol)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.id, i, m.cat, m.name, m.descr, m.price, m.allergens, m.available ? 1 : 0, m.alcohol ? 1 : 0));
+    items.forEach((m, i) => this.sql.exec(`INSERT INTO menu (id, sort, cat, name, descr, price, allergens, available, alcohol, pnp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.id, i, m.cat, m.name, m.descr, m.price, m.allergens, m.available ? 1 : 0, m.alcohol ? 1 : 0, m.pnp ? 1 : 0));
   }
   saveMenu(items) { this.ctx.storage.transactionSync(() => this.writeMenu(items)); return this.menu(); }
   setAvailable(id, on) { this.sql.exec('UPDATE menu SET available = ? WHERE id = ?', on ? 1 : 0, id); return this.staffData(); }
@@ -715,6 +722,11 @@ export default {
         try { items = parseMenuCsv((await body(request))?.csv || ''); } catch (e) { return json({ error: 'csv', message: e.message }, 400); }
         await store.saveMenu(items);
         return json(await store.ordersSummary());
+      }
+      if (route === 'freshpay.xlsx' && method === 'GET') {
+        const file = await xlsx('Sheet1', [FRESHPAY_HEAD, ...freshPayRows((await store.ordersSummary()).menu)]);
+        return new Response(file, { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="FreshPay-artikli-Echoes.xlsx"' } });
       }
       if (route === 'narudzbe.csv' && method === 'GET') {
         return new Response(ordersCsv(await store.exportOrders()), { headers: {

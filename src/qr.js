@@ -60,7 +60,7 @@ const CRC = (() => {
   for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; }
   return t;
 })();
-function crc32(bytes) {
+export function crc32(bytes) {
   let c = 0xffffffff;
   for (const b of bytes) c = CRC[(c ^ b) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;

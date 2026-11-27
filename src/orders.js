@@ -26,7 +26,7 @@ export function validItem(v, sort = 0) {
   return {
     id, name, price, sort: Number.isInteger(v.sort) ? v.sort : sort,
     cat: clean(v.cat, 30) || 'Ostalo', descr: clean(v.descr, 160), allergens: clean(v.allergens, 120),
-    available: v.available ? 1 : 0, alcohol: v.alcohol ? 1 : 0,
+    available: v.available ? 1 : 0, alcohol: v.alcohol ? 1 : 0, pnp: v.pnp ? 1 : 0,
   };
 }
 
@@ -44,13 +44,13 @@ export function parseMenuCsv(textIn) {
   const head = split(lines[0]).map(fold);
   const col = (...n) => head.findIndex(h => n.some(x => h === x || h.startsWith(x)));
   const c = { id: col('id', 'sifra'), cat: col('kategorija'), name: col('naziv'), descr: col('opis'), price: col('cijena'),
-    allergens: col('alergeni'), available: col('dostupno'), alcohol: col('alkohol') };
+    allergens: col('alergeni'), available: col('dostupno'), alcohol: col('alkohol'), pnp: col('pnp', 'porez na potrosnju') };
   if (c.name < 0 || c.price < 0) throw new Error('Nedostaju stupci "Naziv" i "Cijena".');
   const items = [], errors = [];
   lines.slice(1).forEach((l, n) => {
     const r = split(l), get = k => (c[k] >= 0 ? r[c[k]] : '');
     const it = validItem({ id: get('id') || `X${n + 1}`, cat: get('cat'), name: get('name'), descr: get('descr'), price: get('price'),
-      allergens: get('allergens'), available: c.available < 0 || yes(get('available')), alcohol: yes(get('alcohol')) }, n);
+      allergens: get('allergens'), available: c.available < 0 || yes(get('available')), alcohol: yes(get('alcohol')), pnp: yes(get('pnp')) }, n);
     if (it) items.push(it); else errors.push(`Redak ${n + 2}: provjerite ID, naziv i cijenu`);
   });
   if (new Set(items.map(i => i.id)).size !== items.length) errors.push('ID stavke se ponavlja');
@@ -89,4 +89,17 @@ export function ordersCsv(rows) {
       items, eur(r.total), r.pay, r.status]);
   }
   return '﻿' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';
+}
+
+// ---- A1 FreshPay: the menu in the layout of FreshPay's article import template (LoaderHR.xlsx) ----
+// VAT: 13 % for food (serving meals), 25 % for drinks; consumption tax (PNP) 3 % in Mali Lošinj on the items marked PNP.
+export const PNP_RATE = 0.03;
+export const FRESHPAY_HEAD = ['Šifra proizvoda', 'Naziv proizvoda', 'Nabavna cijena', 'Prodajna cijena s PDV', 'POREZ', 'PNP ', 'Oslobođen od poreza',
+  'Razlog oslobođenja od poreza', 'Barkod', 'Grupa proizvoda', 'Proizvod za prodaju', 'Jedinica mjere', 'Proizvod je usluga', 'Skladište',
+  'Stanje skladišta', 'Minimalna zaliha', 'Precizna količina/mjera', 'Broj decimala količine proizvoda/usluge', 'Naknada za proizvod',
+  'Unos prodajne cijene na blagajni'];
+export const vatFor = m => (/^(hrana|slatko|jelo|jela|slastice?)$/i.test(m.cat.trim()) ? '13%' : '25%');
+export function freshPayRows(menu) {
+  return menu.map(m => [m.id, m.name, null, m.price, vatFor(m), m.pnp ? PNP_RATE : null, null, null, null, m.cat, 'Y', 'Komad', null,
+    'Vlastito skladište', null, null, 'N', null, null, 'N']);
 }

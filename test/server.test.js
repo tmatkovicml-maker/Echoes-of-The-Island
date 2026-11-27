@@ -243,6 +243,21 @@ test('QR orders: closed until opened, then priced by the server and numbered per
   assert.ok((await call('/api/meni')).data.items.some(i => i.name === 'Fritule'));
 });
 
+test('FreshPay export is a real .xlsx with the template header', async () => {
+  const bytes = new Uint8Array(await fetch(BASE + '/api/admin/freshpay.xlsx', { headers: { 'X-Admin-Password': PW } }).then(r => r.arrayBuffer()));
+  assert.deepEqual([...bytes.slice(0, 4)], [0x50, 0x4b, 0x03, 0x04]);
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(join(dir, 'fp.xlsx'), bytes);
+  const { execFileSync } = await import('node:child_process');
+  const out = execFileSync('python3', ['-I', '-c', `import openpyxl,sys
+ws=openpyxl.load_workbook(sys.argv[1]).active
+print(ws['A1'].value, ws['D1'].value, ws['F1'].value, ws.max_row)
+for r in ws.iter_rows(min_row=2, values_only=True):
+  if r[0]=='P01': print(r[0], r[3], r[4], r[5], r[9])`, join(dir, 'fp.xlsx')]).toString();
+  assert.match(out, /Šifra proizvoda Prodajna cijena s PDV PNP /);
+  assert.match(out, /P01 2\.7 25% 0\.03 Piće/);
+});
+
 test('QR code of the menu', async () => {
   const svg = await fetch(BASE + '/qr-meni.svg').then(r => r.text());
   assert.ok(svg.includes('<path'));
