@@ -23,6 +23,9 @@
 //   GET  /api/admin/export-tablica.csv  Ime i prezime;Datum;Blok for pasting into the "Prijave" sheet of the planning workbook
 //   GET  /api/admin/meni                 menu and orders per day · POST {items} save the menu · POST meni/import {csv}
 //   GET  /api/admin/narudzbe.csv         all orders for Excel
+//   POST /api/admin/extras               {name, times, from, to, skip}  shifts outside the blocks (organizer's own hours)
+//   POST /api/admin/extras/delete        {ids}
+//   POST|DELETE /api/admin/telegram      connect / disconnect Telegram messages for new orders (TELEGRAM_BOT_TOKEN)
 // QR orders (guests): GET /api/meni · POST /api/narudzba {items: [{id, qty}], pay, name, note, website}
 //   GET /api/narudzba/:token (status) · POST /api/narudzba/:token/otkazi (only while not started)
 // Hut's screen (X-Staff-Pin = STAFF_PIN or ADMIN_PASSWORD): GET /api/osoblje/narudzbe · POST /api/osoblje/narudzbe/:id {status}
@@ -44,7 +47,7 @@ import KITCHEN_PAGE from './kitchen.html';
 import { STATUSES, PAY, businessDay, validItem, parseMenuCsv, priceOrder, ordersCsv } from './orders.js';
 import {
   MAX_WEEK_HOURS, KINDS, PAY_BASE, PAY_PLUS, normalizePhone, formatPhone, isoWeek, isDay, checkChoice, weekHours, payHours,
-  parseSlotsCsv, slotStartMs,
+  parseSlotsCsv, parseDate, addDays, slotStartMs,
 } from './rules.js';
 
 const MINUTE = 60 * 1000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
@@ -102,6 +105,9 @@ export class Store extends DurableObject {
       name TEXT NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL)`);
     this.sql.exec('CREATE INDEX IF NOT EXISTS orders_day ON orders (day, num)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS orders_status ON orders (status)');
+    // shifts outside the A/B blocks, set by the organizer (his own hours: buying in, opening, afternoons)
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS extras (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, name TEXT NOT NULL,
+      start TEXT NOT NULL, "end" TEXT NOT NULL, label TEXT NOT NULL DEFAULT '')`);
     if (this.sql.exec('SELECT COUNT(*) AS n FROM menu').one().n === 0) this.writeMenu(parseMenuCsv(JELOVNIK_CSV));
     if (this.sql.exec('SELECT COUNT(*) AS n FROM slots').one().n === 0) this.insertSlots(parseSlotsCsv(TERMINI_CSV));
   }
@@ -214,6 +220,8 @@ export class Store extends DurableObject {
     const regs = this.sql.exec(`SELECT r.id, r.slot_id, r.name, r.phone, r.status, r.source, r.created, r.token, r.kind, s.day, s.block, s.start, s.hours
       FROM regs r JOIN slots s ON s.id = r.slot_id ORDER BY s.day, s.block, r.created`).toArray();
     return {
+      extras: this.sql.exec(`SELECT id, day, name, start, "end" AS "end", label FROM extras ORDER BY day, start`).toArray(),
+      tg_chats: (this.get('tg_chats') || []).length,
       settings: this.settings(), max_week: MAX_WEEK_HOURS, pay: { base: PAY_BASE, plus: PAY_PLUS }, slots: this.slots(),
       regs: regs.map(r => ({ ...r, phone_fmt: formatPhone(r.phone), day: undefined, hours: undefined, block: undefined, start: undefined })),
       people: this.people(regs),
@@ -378,8 +386,24 @@ export class Store extends DurableObject {
   }
   exportOrders() { return this.sql.exec('SELECT day, num, items, total, pay, status, created FROM orders ORDER BY created').toArray(); }
 
+  // ---- extra shifts outside the blocks (organizer only) ----
+  addExtras(name, days, ranges) {
+    this.ctx.storage.transactionSync(() => {
+      for (const d of days) for (const r of ranges) {
+        this.sql.exec(`INSERT INTO extras (day, name, start, "end", label) VALUES (?, ?, ?, ?, ?)`, d, name, r.start, r.end, r.label);
+      }
+    });
+    return this.adminData();
+  }
+  removeExtras(ids) { for (const id of ids) this.sql.exec('DELETE FROM extras WHERE id = ?', id); return this.adminData(); }
+
+  // ---- Telegram: chats that get a message for every new order ----
+  telegramChats() { return this.get('tg_chats') || []; }
+  saveTelegramChats(list) { this.put('tg_chats', list); return list; }
+
   // ---- privacy: names and phones are deleted on wipe_on (or now, from /admin) ----
   wipe() {
+    this.sql.exec('DELETE FROM extras');
     this.sql.exec(`UPDATE orders SET name = '', note = ''`);
     this.sql.exec('DELETE FROM regs');
     this.sql.exec('DELETE FROM limits');
@@ -410,6 +434,38 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
 const page = (html, robots) => new Response(html, {
   headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEC, ...(robots ? { 'X-Robots-Tag': robots } : {}) },
 });
+// ---- Telegram (optional): TELEGRAM_BOT_TOKEN, chats connected in /admin → Jelovnik ----
+async function telegram(env, method, payload) {
+  const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}),
+  });
+  return r.json().catch(() => ({}));
+}
+async function notifyOrder(env, store, origin, o) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  const chats = await store.telegramChats();
+  if (!chats.length) return;
+  const eur = n => n.toFixed(2).replace('.', ',') + ' €';
+  const text = `🛎 Nova narudžba #${o.num}\n` + o.items.map(i => `${i.qty}× ${i.name}`).join('\n') +
+    `\n${eur(o.total)} · ${o.pay === 'kartica' ? 'kartica (blagajna s karticom)' : 'gotovina'}` +
+    (o.name ? `\nIme: ${o.name}` : '') + (o.note ? `\nNapomena: ${o.note}` : '') +
+    (o.alcohol ? '\n⚠️ 18+ provjeri osobnu' : '') + `\n${origin}/kuhinja`;
+  await Promise.all(chats.map(c => telegram(env, 'sendMessage', { chat_id: c.id, text }).catch(() => {})));
+}
+
+// "08:00-09:00 Nabava; 09:00-12:00 Otvaranje" → [{start, end, label}]
+function parseRanges(v) {
+  const out = [];
+  for (const part of String(v || '').split(/[;\n]/).map(s => s.trim()).filter(Boolean)) {
+    const m = /^(\d{1,2})[:.](\d{2})\s*[–—-]\s*(\d{1,2})[:.](\d{2})\s*(.*)$/.exec(part);
+    if (!m) return null;
+    const start = `${m[1].padStart(2, '0')}:${m[2]}`, end = `${m[3].padStart(2, '0')}:${m[4]}`;
+    if (+m[1] > 23 || +m[3] > 24 || +m[2] > 59 || +m[4] > 59 || end <= start) return null;
+    out.push({ start, end, label: str(m[5], 40) });
+  }
+  return out.length && out.length <= 6 ? out : null;
+}
+
 // HTTP status of a Store result: errors carry a number; an order's own "status" is a word (nova, priprema…)
 const code = r => (typeof r.status === 'number' ? r.status : 200);
 async function body(req) { try { return await req.json(); } catch { return null; } }
@@ -474,7 +530,7 @@ function sheetCsv(rows) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
     const store = env.STORE.get(env.STORE.idFromName('main'));
     const ip = request.headers.get('CF-Connecting-IP') || 'local';
@@ -506,6 +562,7 @@ export default {
       if (!PAY.includes(b.pay)) return json({ error: 'pay' }, 400);
       const name = str(b.name, 30), note = str(b.note, 140);
       const res = await store.placeOrder({ lines: b.items, pay: b.pay, name, note, adult: b.adult === true }, ip);
+      if (res.token) ctx.waitUntil(notifyOrder(env, store, url.origin, { ...res, note }).catch(() => {}));
       return json(res, code(res));
     }
     m = path.match(/^\/api\/narudzba\/([\w-]{16,40})(\/otkazi)?$/);
@@ -587,7 +644,37 @@ export default {
           'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
           'Content-Disposition': 'attachment; filename="prijave-za-tablicu.csv"' } });
       }
-      if (route === 'meni' && method === 'GET') return json(await store.ordersSummary());
+      if (route === 'meni' && method === 'GET') return json({ ...(await store.ordersSummary()), tg_token: !!env.TELEGRAM_BOT_TOKEN, tg_chats: (await store.telegramChats()).length });
+      // Telegram: everyone who has written to the bot is connected and gets a test message
+      if (route === 'telegram' && method === 'POST') {
+        if (!env.TELEGRAM_BOT_TOKEN) return json({ error: 'no_token' }, 400);
+        const up = await telegram(env, 'getUpdates', {}).catch(() => ({}));
+        if (!up.ok) return json({ error: 'bad_token' }, 400);
+        const chats = await store.telegramChats();
+        for (const u of up.result || []) {
+          const c = (u.message || u.my_chat_member || {}).chat;
+          if (c && !chats.some(x => x.id === c.id)) chats.push({ id: c.id, name: str(c.first_name || c.title || c.username || '', 60) });
+        }
+        await store.saveTelegramChats(chats);
+        await Promise.all(chats.map(c => telegram(env, 'sendMessage', { chat_id: c.id, text: '✅ Obavijesti o narudžbama s jelovnika su uključene.' }).catch(() => {})));
+        return json({ chats: chats.map(c => c.name) });
+      }
+      if (route === 'telegram' && method === 'DELETE') { await store.saveTelegramChats([]); return json({ chats: [] }); }
+      if (route === 'extras' && method === 'POST') {
+        const b = await body(request) || {};
+        const name = str(b.name, 40), ranges = parseRanges(b.times);
+        const from = parseDate(b.from || ''), to = parseDate(b.to || '');
+        if (name.length < 2 || !ranges || !from || !to || to < from) return json({ error: 'invalid' }, 400);
+        const skip = new Set(String(b.skip || '').split(/[,;\s]+/).map(x => x && parseDate(x)).filter(Boolean));
+        const days = [];
+        for (let d = from; d <= to && days.length < 60; d = addDays(d, 1)) if (!skip.has(d)) days.push(d);
+        return json(await store.addExtras(name, days, ranges));
+      }
+      if (route === 'extras/delete' && method === 'POST') {
+        const ids = (await body(request))?.ids;
+        if (!Array.isArray(ids) || ids.some(x => !Number.isInteger(x))) return json({ error: 'invalid' }, 400);
+        return json(await store.removeExtras(ids));
+      }
       if (route === 'meni' && method === 'POST') {
         const list = (await body(request))?.items;
         const items = Array.isArray(list) && list.length <= 100 ? list.map((x, i) => validItem(x, i)) : null;

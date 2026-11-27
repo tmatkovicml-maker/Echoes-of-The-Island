@@ -40,6 +40,13 @@ Kasnije promjene:
 | Organizator | prazno | Naziv i kontakt za obavijest o privatnosti. |
 | Automatsko brisanje | **31. 1. 2027.** | Tog dana se brišu sva imena i mobiteli, a prijave se zatvaraju. |
 
+## Vaše smjene i stalni radnici
+- **Stalni radnici u blokovima:** stalne radnike (npr. Kristijan, Mihael, Ozren od 16. 12.) upisujete u blokove kao i ostale: admin → Termini → **+ Dodaj** → **Drugo (ja, prijatelji)**. Tako zauzimaju mjesto, pa učenicima ostaju samo prazna mjesta.
+- **Vaše vrijeme izvan blokova** (nabava 08–09, otvaranje 09–12, popodne 16–19) upisuje se u admin → Termini → **Dodatne smjene izvan blokova A i B**.
+  - Upišete ime, vremena odvojena s „;” (npr. `08:00-09:00 Nabava; 09:00-12:00 Otvaranje; 16:00-19:00 Popodne`), raspon datuma i dane koje treba preskočiti (npr. `14.12., 15.12., 16.12., 25.12.`).
+  - Te smjene vide se samo u adminu, uz svaki dan, s ukupnim satima. Više od 8 h je označeno crveno.
+  - Ne zauzimaju mjesto u bloku i ne ulaze u obračun servisima.
+
 ## Obračun sati za servise
 `/admin` → **Osobe** → **⬇ Obračun sati za servise (CSV)**. Za svaku osobu i godinu daje: servis, redovne sate, sate uz +50 % (noću 22–06, nedjeljom, blagdanom 25. 12., 26. 12. i 1. 1.), ukupno i procjenu neto iznosa (11,15 € i 16,73 € po satu). Prosinac 2026. i siječanj 2027. su u odvojenim recima, jer se godine obračunavaju posebno. Na primjer, blok B 31. 12. daje 6 redovnih sati i 2 sata +50 % u 2026. te 3 sata +50 % u 2027. Iste brojke vide se u tablici na kartici Osobe.
 
@@ -49,6 +56,16 @@ U `/admin` gumb **⬇ Za tablicu (list Prijave)** daje CSV sa stupcima *Ime i pr
 2. U tablici, list **Prijave**, kliknite ćeliju **A5** i zalijepite.
 
 Formule u listovima Prijave, Smjene plan i Učenici tada same izračunaju sate, tjedan, broj prijavljenih i status. Imena za list Učenici upišite točno kao u CSV-u. Provjereno je na kopiji vaše tablice.
+
+## Telegram obavijesti o narudžbama
+Za svaku novu narudžbu stiže poruka na Telegram: broj, stavke, iznos, kartica ili gotovina, ime, napomena i upozorenje „18+” ako je u narudžbi alkohol.
+1. U Telegramu otvorite @BotFather, pošaljite `/newbot` i spremite token.
+2. U Cloudflareu dodajte Secret `TELEGRAM_BOT_TOKEN`, pod Runtime variables and secrets.
+3. Svatko tko treba obavijesti pošalje botu bilo koju poruku.
+4. Kliknite admin → **Jelovnik** → **Poveži**. **Isključi obavijesti** ih gasi.
+
+## Blagajne (A1 Fresh Pay)
+QR narudžbe nisu računi. Račun se izdaje na jednom od dva A1 Fresh Pay uređaja: jedan prima samo gotovinu, a drugi gotovinu i kartice. Na ekranu narudžbi narudžba plaćena karticom ima oznaku **„Kartica · blagajna s karticom”**, pa osoblje zna na kojem uređaju je naplatiti.
 
 ## QR narudžbe (jelovnik)
 Gosti skeniraju QR kod, naruče hranu i piće na mobitelu i dobiju broj narudžbe. Kad je narudžba spremna, mobitel im to pokaže, a plaćaju na šanku **gotovinom ili karticom** kroz vašu postojeću blagajnu. QR narudžbe su samo narudžbe. Nisu računi i ne zamjenjuju fiskalnu blagajnu.

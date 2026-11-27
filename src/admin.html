@@ -105,6 +105,19 @@ textarea { min-height: 110px; }
   <div class="stats" id="stats"></div>
 
   <section id="tab-slots">
+    <details class="card" id="extrasCard">
+      <summary><b>Dodatne smjene izvan blokova A i B</b> <span class="note" id="extrasSum"></span></summary>
+      <p class="note">Za vas i stalne radnike kad rade u drugom vremenu nego blok (npr. nabava 08–09, otvaranje 09–12, popodne 16–19). Vide se samo ovdje, ne zauzimaju mjesto u bloku i ne ulaze u obračun servisima.</p>
+      <form id="extrasForm" class="row" style="align-items:flex-end">
+        <label>Ime<br><input type="text" name="name" required placeholder="npr. Tihomir" style="width:140px"></label>
+        <label>Vremena (odvojena s ;)<br><input type="text" name="times" required value="08:00-09:00 Nabava; 09:00-12:00 Otvaranje; 16:00-19:00 Popodne" style="width:360px"></label>
+        <label>Od<br><input type="text" name="from" required value="10.12.2026." style="width:100px"></label>
+        <label>Do<br><input type="text" name="to" required value="2.1.2027." style="width:100px"></label>
+        <label>Preskoči dane<br><input type="text" name="skip" value="14.12., 15.12., 16.12., 25.12." style="width:190px"></label>
+        <button class="btn primary">Dodaj</button>
+      </form>
+      <div id="extrasPeople" style="margin-top:8px"></div>
+    </details>
     <div class="filters">
       <label><input type="checkbox" id="fFree"> samo termini s praznim mjestima</label>
       <label><input type="checkbox" id="fPending"> samo s prijavama koje čekaju potvrdu</label>
@@ -152,6 +165,18 @@ textarea { min-height: 110px; }
         <input type="file" id="mCsv" accept=".csv,text/csv,text/plain"></p>
       <div id="mErr" class="err" hidden></div>
     </form>
+
+    <div class="card">
+      <h2>Telegram obavijesti o narudžbama</h2>
+      <p id="tgState"></p>
+      <ol class="note">
+        <li>U Telegramu otvorite <b>@BotFather</b>, pošaljite <b>/newbot</b> i dobit ćete token.</li>
+        <li>U Cloudflareu dodajte Secret <b>TELEGRAM_BOT_TOKEN</b> s tim tokenom (Runtime variables and secrets).</li>
+        <li>Svatko tko treba obavijesti (vi, osoblje) otvori svog bota u Telegramu i pošalje mu bilo koju poruku, npr. „bok”.</li>
+        <li>Kliknite <b>Poveži</b>. Svi povezani dobiju probnu poruku, a zatim obavijest za svaku novu narudžbu.</li>
+      </ol>
+      <p class="row"><button class="btn primary" id="tgConnect">Poveži</button><button class="btn" id="tgOff">Isključi obavijesti</button></p>
+    </div>
 
     <div class="card">
       <h2>QR kod za jelovnik</h2>
@@ -291,7 +316,44 @@ function render() {
   renderDays(); renderPeople(); renderSettings();
 }
 
+// extra shifts per day, one line per person: times, labels, hours (over 8 h is marked)
+const mins = t => +t.slice(0, 2) * 60 + +t.slice(3, 5);
+function extrasLine(day) {
+  const list = (data.extras || []).filter(x => x.day === day);
+  if (!list.length) return '';
+  const by = {};
+  for (const x of list) (by[x.name] ||= []).push(x);
+  return '<div class="block" style="background:var(--warn-soft)">' + Object.entries(by).map(([name, xs]) => {
+    const h = xs.reduce((s, x) => s + (mins(x.end) - mins(x.start)) / 60, 0);
+    return `<div class="row" style="justify-content:space-between"><span><b>${esc(name)}</b> izvan blokova: ${xs.map(x => `${x.start}–${x.end}${x.label ? ' ' + esc(x.label) : ''}`).join(', ')}
+      <span class="${h > 8 ? 'over-txt' : 'note'}">(${hrs(Math.round(h * 10) / 10)}${h > 8 ? ', više od 8 h' : ''})</span></span>
+      <button class="btn small" data-delx="${xs.map(x => x.id).join(',')}" title="Ukloni za ovaj dan">✕</button></div>`;
+  }).join('') + '</div>';
+}
+function renderExtrasCard() {
+  const by = {};
+  for (const x of data.extras || []) (by[x.name] ||= new Set()).add(x.day);
+  const names = Object.keys(by);
+  $('extrasSum').textContent = names.length ? `· ${names.map(n => `${n} (${by[n].size} dana)`).join(', ')}` : '';
+  $('extrasPeople').innerHTML = names.map(n => `<button class="btn small" data-delname="${esc(n)}">Ukloni sve dodatne smjene: ${esc(n)}</button>`).join(' ');
+}
+$('extrasForm').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    data = await api('extras', { method: 'POST', body: JSON.stringify({ name: f.name.value, times: f.times.value, from: f.from.value, to: f.to.value, skip: f.skip.value }) });
+    render(); toast('Dodatne smjene su dodane.');
+  } catch (err) { if (err.message !== 'auth') toast('Provjerite ime, vremena (npr. 08:00-09:00 Nabava) i datume.'); }
+};
+$('extrasPeople').addEventListener('click', async e => {
+  const n = e.target.dataset.delname; if (!n) return;
+  if (!confirm(`Ukloniti sve dodatne smjene: ${n}?`)) return;
+  const ids = data.extras.filter(x => x.name === n).map(x => x.id);
+  await run(api('extras/delete', { method: 'POST', body: JSON.stringify({ ids }) })).catch(() => {});
+});
+
 function renderDays() {
+  renderExtrasCard();
   const fFree = $('fFree').checked, fPending = $('fPending').checked, fPast = $('fPast').checked;
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Zagreb' });
   const regsBy = {};
@@ -304,7 +366,7 @@ function renderDays() {
     const shown = slots.filter(s => (!fFree || s.taken < s.capacity) && (!fPending || (regsBy[s.id] || []).some(r => r.status === 'pending')));
     if (!shown.length) continue;
     const note = slots.map(s => s.note).find(Boolean);
-    html += `<div class="day"><h3>${dayLabel(day)}${note ? ` · ${esc(note)}` : ''}${slots[0].event ? `<br><span class="note" style="font-weight:400">${esc(slots[0].event)}</span>` : ''}</h3>`;
+    html += `<div class="day"><h3>${dayLabel(day)}${note ? ` · ${esc(note)}` : ''}${slots[0].event ? `<br><span class="note" style="font-weight:400">${esc(slots[0].event)}</span>` : ''}</h3>${extrasLine(day)}`;
     for (const s of shown) {
       const regs = regsBy[s.id] || [];
       const cls = s.taken >= s.capacity ? 'full' : s.taken === 0 ? 'empty' : '';
@@ -331,6 +393,10 @@ function renderDays() {
 
 $('days').addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.delx) {
+    if (confirm('Ukloniti dodatne smjene za ovaj dan?')) await run(api('extras/delete', { method: 'POST', body: JSON.stringify({ ids: t.dataset.delx.split(',').map(Number) }) })).catch(() => {});
+    return;
+  }
   if (t.dataset.add) { e.preventDefault(); const f = document.querySelector(`[data-addform="${t.dataset.add}"]`); f.hidden = !f.hidden; if (!f.hidden) f.name.focus(); }
   if (t.dataset.del) {
     const r = data.regs.find(x => x.id === +t.dataset.del);
@@ -448,6 +514,8 @@ function renderMenu() {
       <td>${esc(Object.entries(d.items).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n, q]) => q + '× ' + n).join(', '))}</td></tr>`).join('')
     || '<tr><td colspan="5" class="note">Još nema narudžbi.</td></tr>');
   renderItems(mdata.menu);
+  $('tgState').innerHTML = !mdata.tg_token ? '<span class="over-txt">TELEGRAM_BOT_TOKEN nije postavljen u Cloudflareu.</span>'
+    : mdata.tg_chats ? `Uključeno: obavijesti dobiva <b>${mdata.tg_chats}</b> ${mdata.tg_chats === 1 ? 'osoba' : 'osoba/grupa'}.` : 'Token je postavljen. Još nitko nije povezan.';
   $('qrMenuUrl').textContent = location.origin + '/meni';
   if (!$('qrMenuImg').src) $('qrMenuImg').src = '/qr-meni.svg';
 }
@@ -490,6 +558,11 @@ $('mCsv').onchange = async () => {
 $('mToggle').onclick = async () => {
   try { await api('settings', { method: 'POST', body: JSON.stringify({ orders_open: !mdata.open }) }); await loadMenu(); } catch {}
 };
+$('tgConnect').onclick = async () => {
+  try { const r = await api('telegram', { method: 'POST' }); toast(r.chats.length ? `Povezano: ${r.chats.join(', ')}` : 'Nitko još nije pisao botu.'); loadMenu(); }
+  catch (e) { if (e.message !== 'auth') toast(e.error === 'no_token' ? 'Prvo dodajte TELEGRAM_BOT_TOKEN u Cloudflare.' : e.error === 'bad_token' ? 'Token nije ispravan.' : e.message); }
+};
+$('tgOff').onclick = async () => { if (confirm('Isključiti Telegram obavijesti?')) { await api('telegram', { method: 'DELETE' }).catch(() => {}); loadMenu(); } };
 $('ordersCsv').onclick = () => download('narudzbe.csv', `narudzbe-advent-${new Date().toISOString().slice(0, 10)}.csv`);
 
 // refresh every 30 s while the page is open (new sign-ups come in)

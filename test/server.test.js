@@ -250,6 +250,26 @@ test('QR code of the menu', async () => {
   assert.deepEqual([...png.slice(0, 4)], [137, 80, 78, 71]);
 });
 
+test('extra shifts outside the blocks: every day in a range except the skipped days', async () => {
+  const r = await call('/api/admin/extras', { admin: true, body: { name: 'Vlasnik', times: '08:00-09:00 Nabava; 09:00-12:00 Otvaranje; 16:00-19:00',
+    from: '10.12.2026.', to: '2.1.2027.', skip: '14.12., 15.12., 16.12., 25.12.' } });
+  assert.equal(r.status, 200);
+  const days = new Set(r.data.extras.filter(x => x.name === 'Vlasnik').map(x => x.day));
+  assert.equal(days.size, 20);                                    // 24 days − 4 skipped
+  assert.ok(!days.has('2026-12-25') && !days.has('2026-12-14') && days.has('2026-12-17'));
+  assert.deepEqual(r.data.extras.filter(x => x.day === '2026-12-10').map(x => [x.start, x.end, x.label]),
+    [['08:00', '09:00', 'Nabava'], ['09:00', '12:00', 'Otvaranje'], ['16:00', '19:00', '']]);
+  // they take no place in the blocks
+  const a17 = (await call('/api/admin/data', { admin: true })).data.slots.find(s => s.id === '2026-12-17-A');
+  assert.equal(a17.taken, 0);
+  assert.equal((await call('/api/admin/extras', { admin: true, body: { name: 'X', times: '19:00-16:00', from: '10.12.2026.', to: '11.12.2026.' } })).status, 400);
+  const ids = r.data.extras.filter(x => x.day === '2026-12-10').map(x => x.id);
+  const after = await call('/api/admin/extras/delete', { admin: true, body: { ids } });
+  assert.equal(after.data.extras.filter(x => x.day === '2026-12-10').length, 0);
+  // Telegram without a token: connecting says so, orders still work
+  assert.equal((await call('/api/admin/telegram', { admin: true, body: {} })).data.error, 'no_token');
+});
+
 test('per-IP limit on sign-ups', async () => {
   const one = [];
   for (let i = 0; i < 17; i++) one.push(await call('/api/prijava', { ip: '10.200.0.1', body: { name: 'Spam Spam', phone: phone(2000 + i), slots: ['2027-01-02-A'], kind: 'student', adult: true, consent: true } }));

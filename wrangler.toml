@@ -1,12 +1,13 @@
 # Cloudflare Worker for the Advent hut: shift sign-up and QR orders (deployed by Cloudflare Workers Builds from this repository).
 # Set the organizer's password once in the dashboard:
 #   Workers & Pages → echoes-of-the-island → Settings → Variables and Secrets → Add → type "Secret", name ADMIN_PASSWORD
+# Optional Secret TELEGRAM_BOT_TOKEN: a message for every new order (connect chats in /admin → Jelovnik).
 # Also a Secret STAFF_PIN: the PIN for the hut's order screen (/kuhinja), so staff do not need the organizer's password.
 # Optional variable PUBLIC_URL (e.g. https://prijave.example.hr/) if the page gets its own domain: the QR code then points there.
 name = "echoes-of-the-island"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
-# Keep variables set in the dashboard (ADMIN_PASSWORD, STAFF_PIN, PUBLIC_URL) when Cloudflare redeploys from GitHub
+# Keep variables set in the dashboard (ADMIN_PASSWORD, STAFF_PIN, TELEGRAM_BOT_TOKEN, PUBLIC_URL) when Cloudflare redeploys from GitHub
 keep_vars = true
 
 [[durable_objects.bindings]]
